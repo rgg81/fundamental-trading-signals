@@ -1,0 +1,41 @@
+Metadata-Version: 2.1
+Name: fred-data-fetch
+Version: 0.1.0
+Summary: A package to fetch macroeconomic data from FRED
+Home-page: https://github.com/rgg81/fundamental-trading-signals
+Author: Roberto Gomes
+Author-email: roberto.gomes@gmail.com
+Classifier: Programming Language :: Python :: 3
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: OS Independent
+Requires-Python: >=3.11
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Requires-Dist: pandas
+Requires-Dist: fredapi
+Requires-Dist: requests
+Requires-Dist: pyjstat
+
+# 📈 Fundamental Trading Signals
+
+[![Build Status](https://github.com/rgg81/fundamental-trading-signals/actions/workflows/ci.yml/badge.svg)](https://github.com/rgg81/fundamental-trading-signals/actions)
+
+An open-source project for generating **buy/sell signals** based on **fundamental macroeconomic data** like **inflation, interest rates, money supply, and trade balances**.
+
+## 🚀 Features
+✅ Fetch **fundamental macroeconomic indicators** from sources like **FRED**  
+✅ Preprocess and transform raw economic data into **usable features**  
+✅ Apply **machine learning models** (Regime-Switching, Random Forests, LSTMs)  
+✅ Generate **buy/sell trading signals** based on macroeconomic trends  
+✅ Backtest strategies with **historical data**  
+
+## 📊 Data Sources
+We fetch macroeconomic indicators from:
+- **[FRED (Federal Reserve Economic Data)](https://fred.stlouisfed.org/)**
+- ECB, World Bank (planned)
+
+## 🛠 Installation
+```bash
+git clone https://github.com/rgg81/fundamental-trading-signals.git
+cd fundamental-trading-signals
+pip install -r requirements.txt

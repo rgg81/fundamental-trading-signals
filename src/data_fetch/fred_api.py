@@ -1,12 +1,12 @@
 import os
+
 import pandas as pd
 from fredapi import Fred
-import requests
-from pyjstat import pyjstat
 
 # Load API Key from environment variable or config file
 FRED_API_KEY = os.getenv("FRED_API_KEY")
-fred = Fred(api_key=FRED_API_KEY)
+if FRED_API_KEY is None:
+    FRED_API_KEY = "NO_API_KEY"
 
 # List of FRED series IDs for macroeconomic indicators
 FRED_SERIES = {
@@ -24,6 +24,7 @@ ONE_MONTH_MINUS_ONE_FRED_SERIES = ["EU_CPI", "EU_10Y_Yield", "US_CPI", "US_Core_
 
 
 def fetch_fred_data(start_date="2000-01-01", end_date=None):
+    fred = Fred(api_key=FRED_API_KEY)
     """Fetches macroeconomic data from FRED and resamples it to the last day of each month."""
     data = {}
 
@@ -38,6 +39,8 @@ def fetch_fred_data(start_date="2000-01-01", end_date=None):
             data[name] = df
         except Exception as e:
             print(f"Error fetching {name} ({series_id}): {e}")
+            raise
+
 
     # Merge all series into a single DataFrame
     macro_data = pd.concat(data.values(), axis=1)

@@ -1,0 +1,11 @@
+LICENSE
+README.md
+setup.py
+src/fred_data_fetch.egg-info/PKG-INFO
+src/fred_data_fetch.egg-info/SOURCES.txt
+src/fred_data_fetch.egg-info/dependency_links.txt
+src/fred_data_fetch.egg-info/requires.txt
+src/fred_data_fetch.egg-info/top_level.txt
+tests/test_data_fetch.py
+tests/test_features.py
+tests/test_signals.py
