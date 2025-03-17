@@ -4,20 +4,23 @@ from fredapi import Fred
 import requests
 from pyjstat import pyjstat
 
-
 # Load API Key from environment variable or config file
 FRED_API_KEY = os.getenv("FRED_API_KEY")
 fred = Fred(api_key=FRED_API_KEY)
 
 # List of FRED series IDs for macroeconomic indicators
 FRED_SERIES = {
-    "US_CPI": "CPIAUCSL",  # US Consumer Price Index
-    "US_Core_CPI": "CPILFESL",  # US Core CPI
-    "Fed_Funds_Rate": "FEDFUNDS",  # US Effective Federal Funds Rate
+    "EU_CPI": "CP0000EZ19M086NEST",  # Euro Area Harmonized CPI (-1 month)
+    "EU_10Y_Yield": "IRLTLT01EZM156N",  # Euro Area 10-Year Bond Yield (-1 month)
     "ECB_Deposit_Rate": "ECBDFR",  # ECB Deposit Rate
+    "US_CPI": "CPIAUCSL",  # US Consumer Price Index (-1 month)
+    "US_Core_CPI": "CPILFESL",  # US Core CPI (-1 month)
+    "Fed_Funds_Rate": "FEDFUNDS",  # US Effective Federal Funds Rate (-1 month)
     "US_10Y_Yield": "DGS10",  # US 10-Year Treasury Yield
     "VIX": "VIXCLS",  # Volatility Index
 }
+
+ONE_MONTH_MINUS_ONE_FRED_SERIES = ["EU_CPI", "EU_10Y_Yield", "US_CPI", "US_Core_CPI", "Fed_Funds_Rate"]
 
 
 def fetch_fred_data(start_date="2000-01-01", end_date=None):
@@ -39,6 +42,8 @@ def fetch_fred_data(start_date="2000-01-01", end_date=None):
     # Merge all series into a single DataFrame
     macro_data = pd.concat(data.values(), axis=1)
     macro_data.index.name = "Date"
+    # Shift data by two months to account for data delay
+    macro_data[ONE_MONTH_MINUS_ONE_FRED_SERIES] = macro_data[ONE_MONTH_MINUS_ONE_FRED_SERIES].shift(1)
     return macro_data
 
 
