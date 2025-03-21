@@ -12,6 +12,7 @@ LIVE_MODE = True
 DOWNLOAD_DIR = "download"
 HISTORICAL_DAYS = 9200
 CHUNK_DAYS = 300
+SYMBOLS = ["EURUSD", "usa500idxusd"]
 
 
 def ensure_download_directory():
@@ -25,7 +26,7 @@ def download_symbol_data(symbol: str, start_date: datetime.datetime, end_date: d
     Download symbol data for a given date range using dukascopy-node.
     """
     instrument = symbol.lower()
-    output_file = os.path.join(DOWNLOAD_DIR, f"{instrument}.csv")
+    output_file = f"{instrument}"
 
     subprocess.run([
         "npx", "dukascopy-node",
@@ -38,7 +39,7 @@ def download_symbol_data(symbol: str, start_date: datetime.datetime, end_date: d
     ], check=True)
 
     try:
-        df = pd.read_csv(output_file)
+        df = pd.read_csv(f"download/{output_file}.csv")
         return df
     except Exception as ex:
         print(f"Error reading downloaded data for {symbol}: {ex}")
@@ -84,24 +85,35 @@ def download_symbol(symbol: str):
 
     # Combine all chunks into a single DataFrame
     combined_data = np.concatenate(result, axis=0)
-    df = pd.DataFrame(combined_data, columns=["Date", "Open", "High", "Low", "Close"])
+    df = pd.DataFrame(combined_data, columns=["Date", f"{symbol}_Open", f"{symbol}_High", f"{symbol}_Low", f"{symbol}_Close"])
 
     # Process the DataFrame
     df["Date"] = pd.to_datetime(df['Date'], unit='ms')
     df.set_index("Date", inplace=True)
     df = df.resample("ME").last()  # Resample to monthly data
-    df = df.drop_duplicates(subset='Date', keep="last")
-
     # Save to CSV
     output_file = f"{symbol}.csv"
-    df.to_csv(output_file, index=False)
+    df.to_csv(output_file)
     print(f"Data for {symbol} saved to {output_file}.")
+    return df
+
+
+def get_all_symbols_data():
+    """
+    Download data for all symbols and return a list of DataFrames.
+    """
+    # List of symbols to download
+    with Pool(processes=1 if LIVE_MODE else len(SYMBOLS)) as pool:
+        results = pool.map(download_symbol, SYMBOLS)
+    return results
 
 
 if __name__ == '__main__':
-    # List of symbols to download
-    symbols = ["EURUSD", "bundtreur", "usa500idxusd", "ustbondtrusd", "eusidxeur"]
 
     # Use multiprocessing to download data for all symbols
-    with Pool(processes=1 if LIVE_MODE else len(symbols)) as pool:
-        pool.map(download_symbol, symbols)
+    dataframes = get_all_symbols_data()
+
+    # Print sample data
+    for symbol, df in zip(SYMBOLS, dataframes):
+        print(f"Data for {symbol}:")
+        print(df.tail())
