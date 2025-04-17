@@ -1,2 +1,24 @@
 *.csv
 .idea
+
+# Python cache files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+*.egg
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# VS Code files
+.vscode/
+*.code-workspace
+.history/
+
+# Environment files
+env/
+venv/
+ENV/

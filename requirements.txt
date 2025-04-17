@@ -2,4 +2,9 @@ pandas~=2.2.3
 fredapi~=0.5.2
 requests~=2.32.3
 pyjstat~=2.4.0
-numpy~=2.2.3
+numpy==1.26.4
+python-dotenv~=1.0.0
+quantstats>=0.0.59
+optuna>=3.0.0
+scikit-learn>=1.2.0
+matplotlib>=3.5.0

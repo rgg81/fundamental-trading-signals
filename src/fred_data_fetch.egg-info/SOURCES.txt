@@ -6,6 +6,8 @@ src/fred_data_fetch.egg-info/SOURCES.txt
 src/fred_data_fetch.egg-info/dependency_links.txt
 src/fred_data_fetch.egg-info/requires.txt
 src/fred_data_fetch.egg-info/top_level.txt
-tests/test_data_fetch.py
+tests/test_backtest.py
+tests/test_data_fetch_fred.py
+tests/test_duskacopy_api.py
 tests/test_features.py
 tests/test_signals.py
