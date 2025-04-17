@@ -1,5 +1,5 @@
 import pandas as pd
-from .strategy import RandomStrategy
+from signals.strategy import RandomStrategy
 
 class Backtest:
     def __init__(self, strategy, max_amount=10, stop_loss=0.015, close_col='Close'):
@@ -33,14 +33,14 @@ class Backtest:
                 if i + 1 < len(data):
                     next_close = data.iloc[i + 1][self.close_col]
                     # percentage change
-                    profit_loss = ((next_close - current_data[self.close_col]) / current_data[self.close_col]) * (amount / self.max_amount)
-                    profit_loss = max(min(profit_loss, self.stop_loss), -self.stop_loss)
+                    profit_loss = ((next_close - current_data[self.close_col]) / current_data[self.close_col]) 
+                    profit_loss = max(min(profit_loss, self.stop_loss), -self.stop_loss) * (amount / self.max_amount)
             else:
                 if i + 1 < len(data):
                     next_close = data.iloc[i + 1][self.close_col]
                     # percentage change
-                    profit_loss = ((current_data[self.close_col] - next_close) / current_data[self.close_col]) * (amount / self.max_amount)
-                    profit_loss = max(min(profit_loss, self.stop_loss), -self.stop_loss)
+                    profit_loss = ((current_data[self.close_col] - next_close) / current_data[self.close_col]) 
+                    profit_loss = max(min(profit_loss, self.stop_loss), -self.stop_loss) * (amount / self.max_amount)
             result = {
                 'Date': current_data['Date'],
                 'Signal': signal,

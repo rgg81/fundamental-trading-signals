@@ -50,12 +50,11 @@ class LGBMOptunaStrategy(Strategy):
                 'metric': 'binary_logloss',
                 'verbosity': -1,
                 # can I get different booting types?
-                'boosting_type': 'gbdt',
-                'num_iterations': trial.suggest_int('num_iterations', 5, 50),
+                'boosting_type': trial.suggest_categorical('boosting_type', ['gbdt', 'dart', 'rf']),
+                'num_iterations': trial.suggest_int('num_iterations', 10, 50),
                 'max_depth': trial.suggest_int('max_depth', 4, 5),
-                'learning_rate': trial.suggest_float('learning_rate', 0.05, 0.3),
-                'feature_fraction': trial.suggest_float('feature_fraction', 0.3, 1.0),
-                'bagging_fraction': trial.suggest_float('bagging_fraction', 0.3, 1.0),
+                'learning_rate': trial.suggest_float('learning_rate', 0.1, 0.3),
+                'feature_fraction': trial.suggest_float('feature_fraction', 0.1, 1.0),
                 'is_unbalance': True
             }
             tscv = TimeSeriesSplit(n_splits=self.n_splits)
