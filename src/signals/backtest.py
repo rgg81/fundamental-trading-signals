@@ -1,5 +1,5 @@
 import pandas as pd
-from strategy import RandomStrategy
+from .strategy import RandomStrategy
 
 class Backtest:
     def __init__(self, strategy, max_amount=10, stop_loss=0.015, close_col='Close'):
