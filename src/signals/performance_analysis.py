@@ -2,9 +2,9 @@ import pandas as pd
 import numpy as np
 import quantstats as qs
 import matplotlib.pyplot as plt
-from ensemble_strategy import VotingEnsembleStrategy
-from strategy import LGBMOptunaStrategy, Strategy, RandomStrategy
+from lgbm_strategy import LGBMOptunaStrategy
 from backtest import Backtest
+from mlp_strategy import MLPOptunaStrategy
 
 # Set the output format for QuantStats
 qs.extend_pandas()
@@ -54,7 +54,8 @@ if __name__ == "__main__":
     
     # Create and run backtest with random strategy
     #strategy = RandomStrategy()
-    strategy = LGBMOptunaStrategy()
+    #strategy = LGBMOptunaStrategy()
+    strategy = MLPOptunaStrategy()
     #strategy = VotingEnsembleStrategy(
     #    voting_method='majority',
     #    n_splits=5,
