@@ -29,4 +29,6 @@ class RandomStrategy(Strategy):
         amount = 10
         
         return signal, amount
-#         
+
+
+
