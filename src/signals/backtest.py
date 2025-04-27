@@ -22,11 +22,12 @@ class Backtest:
             current_data_frame = data.iloc[i:1 + i]
             past_data = data.iloc[:i]
 
-            if past_data.empty or i < 160:  # Ensure we have enough past data for the strategy
+            if past_data.empty or i < 160 or current_data_frame.empty:  # Ensure we have enough past data for the strategy
                 # Skip the first row since there's no past data
                 continue
 
             signal, amount = self.strategy.generate_signal(past_data, current_data_frame)
+            if signal is None: continue
             profit_loss = 0
 
             if signal == 1:  # Buy signal
