@@ -35,13 +35,13 @@ class SVCOptunaStrategy(Strategy):
         def objective(trial):
             # Define the hyperparameter search space for SVC
             params = {
-                'C': trial.suggest_float('C', 0.1, 100.0, log=True),
+              #  'C': trial.suggest_float('C', 0.1, 100.0, log=True),
                 'kernel': trial.suggest_categorical('kernel', ['linear', 'poly', 'rbf', 'sigmoid']),
-                'degree': trial.suggest_int('degree', 2, 5),  # only used by poly kernel
-                'gamma': trial.suggest_categorical('gamma', ['scale', 'auto']),
+              #  'degree': trial.suggest_int('degree', 2, 5),  # only used by poly kernel
+              #  'gamma': trial.suggest_categorical('gamma', ['scale', 'auto']),
                 'class_weight': trial.suggest_categorical('class_weight', ['balanced', None]),
-                'probability': True,  # Enable probability estimates
-                'random_state': self.random_state
+              #  'probability': True,  # Enable probability estimates
+              #  'random_state': self.random_state
             }
             
             tscv = TimeSeriesSplit(n_splits=self.n_splits)
@@ -93,6 +93,9 @@ class SVCOptunaStrategy(Strategy):
         # X all data frame less Label, Date and Close
         past_data = self._clean_data(past_data)
         current_data = self._clean_data(current_data)
+
+        if current_data.empty:
+            return None, 10
         
         columns_to_drop = ['Label', 'Date', 'EURUSD_Close']
         X = past_data.drop(columns=columns_to_drop)

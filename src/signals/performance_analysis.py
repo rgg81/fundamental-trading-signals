@@ -9,6 +9,7 @@ from logistic_strategy import LogisticRegressionOptunaStrategy
 from mlp_strategy import MLPOptunaStrategy
 from nb_strategy import GaussianNBOptunaStrategy
 from rf_strategy import RandomForestOptunaStrategy
+from svc_strategy import SVCOptunaStrategy
 
 # Set the output format for QuantStats
 qs.extend_pandas()
@@ -63,7 +64,8 @@ if __name__ == "__main__":
     #strategy = LogisticRegressionOptunaStrategy()
     #strategy = GaussianNBOptunaStrategy()
     #strategy = KNNOptunaStrategy()
-    strategy = RandomForestOptunaStrategy()
+    #strategy = RandomForestOptunaStrategy()
+    strategy = SVCOptunaStrategy()
     #strategy = VotingEnsembleStrategy(
     #    voting_method='majority',
     #    n_splits=5,

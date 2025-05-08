@@ -7,7 +7,7 @@ from sklearn.metrics import accuracy_score, classification_report
 from strategy import Strategy
 
 class RandomForestOptunaStrategy(Strategy):
-    def __init__(self, n_trials=50, n_splits=5, random_state=42, total_models=5):
+    def __init__(self, n_trials=35, n_splits=5, random_state=42, total_models=35):
         self.n_trials = n_trials
         self.n_splits = n_splits
         self.random_state = random_state
@@ -35,7 +35,7 @@ class RandomForestOptunaStrategy(Strategy):
         def objective(trial):
             # Define the hyperparameter search space for RandomForest
             params = {
-                'n_estimators': trial.suggest_int('n_estimators', 1, 100),
+                'n_estimators': trial.suggest_int('n_estimators', 1, 30),
                 'max_depth': trial.suggest_int('max_depth', 1, 5),
                 'min_samples_split': trial.suggest_int('min_samples_split', 2, 20),
                 'min_samples_leaf': trial.suggest_int('min_samples_leaf', 1, 10),
