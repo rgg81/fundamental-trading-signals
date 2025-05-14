@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import quantstats as qs
 import matplotlib.pyplot as plt
+from adaboost_strategy import AdaBoostOptunaStrategy
 from knn_strategy import KNNOptunaStrategy
 from lgbm_strategy import LGBMOptunaStrategy
 from backtest import Backtest
@@ -65,7 +66,8 @@ if __name__ == "__main__":
     #strategy = GaussianNBOptunaStrategy()
     #strategy = KNNOptunaStrategy()
     #strategy = RandomForestOptunaStrategy()
-    strategy = SVCOptunaStrategy()
+    # strategy = SVCOptunaStrategy()
+    strategy = AdaBoostOptunaStrategy()
     #strategy = VotingEnsembleStrategy(
     #    voting_method='majority',
     #    n_splits=5,
