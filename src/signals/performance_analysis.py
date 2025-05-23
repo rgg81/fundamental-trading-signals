@@ -11,6 +11,7 @@ from mlp_strategy import MLPOptunaStrategy
 from nb_strategy import GaussianNBOptunaStrategy
 from rf_strategy import RandomForestOptunaStrategy
 from svc_strategy import SVCOptunaStrategy
+from histgb_strategy import HistGBOptunaStrategy
 
 # Set the output format for QuantStats
 qs.extend_pandas()
@@ -67,7 +68,8 @@ if __name__ == "__main__":
     #strategy = KNNOptunaStrategy()
     #strategy = RandomForestOptunaStrategy()
     # strategy = SVCOptunaStrategy()
-    strategy = AdaBoostOptunaStrategy()
+    # strategy = AdaBoostOptunaStrategy()
+    strategy = HistGBOptunaStrategy()
     #strategy = VotingEnsembleStrategy(
     #    voting_method='majority',
     #    n_splits=5,
