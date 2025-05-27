@@ -22,3 +22,6 @@ __pycache__/
 env/
 venv/
 ENV/
+
+# catboost directories
+catboost_info/
