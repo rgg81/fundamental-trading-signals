@@ -35,18 +35,18 @@ class XGBoostOptunaStrategy(Strategy):
         def objective(trial):
             # Define the hyperparameter search space for XGBoost
             params = {
-                'n_estimators': trial.suggest_int('n_estimators', 1, 300),
+                'n_estimators': trial.suggest_int('n_estimators', 500, 5000, log=True),
                 'learning_rate': trial.suggest_float('learning_rate', 0.01, 0.3, log=True),
-                'max_depth': trial.suggest_int('max_depth', 3, 9),
-                'min_child_weight': trial.suggest_int('min_child_weight', 1, 30),
+                'max_depth': trial.suggest_int('max_depth', 1, 2),
+               # 'min_child_weight': trial.suggest_int('min_child_weight', 1, 30),
                 'subsample': trial.suggest_float('subsample', 0.1, 1.0),
                 'colsample_bytree': trial.suggest_float('colsample_bytree', 0.1, 1.0),
-                'gamma': trial.suggest_float('gamma', 0.1, 5, log=True),
-                'reg_alpha': trial.suggest_float('reg_alpha', 0.1, 5, log=True),
-                'reg_lambda': trial.suggest_float('reg_lambda', 1, 5, log=True),
+                'gamma': trial.suggest_float('gamma', 0.1, 10, log=True),
+                'reg_alpha': trial.suggest_float('reg_alpha', 0.1, 10, log=True),
+                'reg_lambda': trial.suggest_float('reg_lambda', 1, 10, log=True),
                # 'random_state': self.random_state,
              #   'use_label_encoder': False,  # Prevents warning about label encoder
-                'eval_metric': 'logloss'  # Required for newer versions of XGBoost
+              #  'eval_metric': 'logloss'  # Required for newer versions of XGBoost
             }
             
             tscv = TimeSeriesSplit(n_splits=self.n_splits)

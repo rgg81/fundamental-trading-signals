@@ -72,8 +72,8 @@ if __name__ == "__main__":
     # strategy = SVCOptunaStrategy()
     # strategy = AdaBoostOptunaStrategy()
     # strategy = HistGBOptunaStrategy()
-    # strategy = XGBoostOptunaStrategy()
-    strategy = CatBoostOptunaStrategy()
+    strategy = XGBoostOptunaStrategy()
+    #strategy = CatBoostOptunaStrategy()
     #strategy = EBMOptunaStrategy()
     #strategy = VotingEnsembleStrategy(
     #    voting_method='majority',
