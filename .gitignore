@@ -25,3 +25,6 @@ ENV/
 
 # catboost directories
 catboost_info/
+
+checkpoints/
+lightning_logs/

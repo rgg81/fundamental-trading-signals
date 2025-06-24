@@ -14,6 +14,7 @@ from svc_strategy import SVCOptunaStrategy
 from histgb_strategy import HistGBOptunaStrategy
 from xgboost_strategy import XGBoostOptunaStrategy
 from catboost_strategy import CatBoostOptunaStrategy
+from tff_strategy import TemporalFusionTransformerOptunaStrategy
 
 # Set the output format for QuantStats
 qs.extend_pandas()
@@ -72,15 +73,16 @@ if __name__ == "__main__":
     # strategy = SVCOptunaStrategy()
     # strategy = AdaBoostOptunaStrategy()
     # strategy = HistGBOptunaStrategy()
-    strategy = XGBoostOptunaStrategy()
-    #strategy = CatBoostOptunaStrategy()
-    #strategy = EBMOptunaStrategy()
-    #strategy = VotingEnsembleStrategy(
+    # strategy = XGBoostOptunaStrategy()
+    # strategy = CatBoostOptunaStrategy()
+    strategy = TemporalFusionTransformerOptunaStrategy()
+    # strategy = EBMOptunaStrategy()
+    # strategy = VotingEnsembleStrategy(
     #    voting_method='majority',
     #    n_splits=5,
     #    threshold=0.5,
     #    random_state=42
-    #)
+    # )
 
     backtest = Backtest(strategy, close_col='EURUSD_Close')
     random_results = backtest.run(data)
