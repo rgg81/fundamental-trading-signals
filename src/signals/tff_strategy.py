@@ -29,7 +29,7 @@ torch.set_float32_matmul_precision('medium')
 
 
 class TemporalFusionTransformerOptunaStrategy(Strategy):
-    def __init__(self, n_trials=3, n_splits=3, random_state=42, prediction_length=1, max_encoder_length=5):
+    def __init__(self, n_trials=1, n_splits=3, random_state=42, prediction_length=1, max_encoder_length=5):
         self.n_trials = n_trials
         self.n_splits = n_splits
         self.random_state = random_state
@@ -150,18 +150,18 @@ class TemporalFusionTransformerOptunaStrategy(Strategy):
             
             # Create data loaders
             train_dataloader = self.training_data.to_dataloader(
-                batch_size=32, num_workers=0, shuffle=True
+                batch_size=32, num_workers=19, shuffle=True
             )
             val_dataloader = self.validation_data.to_dataloader(
-                batch_size=32, num_workers=0, shuffle=False
+                batch_size=32, num_workers=19, shuffle=False
             )
 
             all_train_dataloader = all_training_data.to_dataloader(
-                batch_size=32, num_workers=0, shuffle=True
+                batch_size=32, num_workers=19, shuffle=True
             )
 
             all_train_dataloader_pred = all_training_data_pred.to_dataloader(
-                batch_size=1, num_workers=0, shuffle=False
+                batch_size=1, num_workers=19, shuffle=False
             )
 
             return train_dataloader, val_dataloader, df.iloc[self.max_encoder_length:], all_train_dataloader, all_train_dataloader_pred
@@ -255,8 +255,8 @@ class TemporalFusionTransformerOptunaStrategy(Strategy):
             
             trainer = pl.Trainer(
                 max_epochs=params['max_epochs'],
-                accelerator='gpu',  # Use GPU
-                devices=1,  # Use one GPU
+                accelerator='gpu',  # Use cpu
+                devices=1,  # Use one cpu
                 gradient_clip_val=0.1,
                 enable_progress_bar=False,  # Disable progress bar during optimization
                 logger=False,  # Disable logging during optimization
@@ -302,7 +302,7 @@ class TemporalFusionTransformerOptunaStrategy(Strategy):
             max_epochs=self.best_params['max_epochs'],
             accelerator='gpu',  # Use CPU
             gradient_clip_val=0.1,
-            #devices=1,  # Use one GPU
+            #devices=1,  # Use one cpu
         )
         
         # Train the final model
