@@ -15,6 +15,7 @@ from histgb_strategy import HistGBOptunaStrategy
 from xgboost_strategy import XGBoostOptunaStrategy
 from catboost_strategy import CatBoostOptunaStrategy
 from tff_strategy import TemporalFusionTransformerOptunaStrategy
+from tabnet_strategy import TabNetOptunaStrategy
 
 # Set the output format for QuantStats
 qs.extend_pandas()
@@ -75,7 +76,8 @@ if __name__ == "__main__":
     # strategy = HistGBOptunaStrategy()
     # strategy = XGBoostOptunaStrategy()
     # strategy = CatBoostOptunaStrategy()
-    strategy = TemporalFusionTransformerOptunaStrategy()
+    # strategy = TemporalFusionTransformerOptunaStrategy()
+    strategy = TabNetOptunaStrategy()
     # strategy = EBMOptunaStrategy()
     # strategy = VotingEnsembleStrategy(
     #    voting_method='majority',
