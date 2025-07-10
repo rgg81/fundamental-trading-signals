@@ -11,7 +11,7 @@ import warnings
 warnings.filterwarnings('ignore')
 
 class TabNetOptunaStrategy(Strategy):
-    def __init__(self, n_trials=2, n_splits=5, random_state=42, use_gpu=True):
+    def __init__(self, n_trials=5, n_splits=5, random_state=42, use_gpu=True):
         self.n_trials = n_trials
         self.n_splits = n_splits
         self.random_state = random_state
@@ -65,7 +65,7 @@ class TabNetOptunaStrategy(Strategy):
             params = {
               #  'n_d': trial.suggest_int('n_d', 8, 64),  # Width of the decision prediction layer
               #  'n_a': trial.suggest_int('n_a', 8, 64),  # Width of the attention embedding for each mask
-              #  'n_steps': trial.suggest_int('n_steps', 3, 10),  # Number of steps in the architecture
+             #   'n_steps': trial.suggest_int('n_steps', 3, 10),  # Number of steps in the architecture
               #  'gamma': trial.suggest_float('gamma', 1.0, 2.0),  # Coefficient for feature reusage in the masks
               #  'n_independent': trial.suggest_int('n_independent', 1, 5),  # Number of independent Glu layers at each step
               #  'n_shared': trial.suggest_int('n_shared', 1, 5),  # Number of shared Glu layers at each step
@@ -73,7 +73,7 @@ class TabNetOptunaStrategy(Strategy):
               #  'momentum': trial.suggest_float('momentum', 0.01, 0.4),  # Momentum for batch normalization
               #  'clip_value': trial.suggest_float('clip_value', 1.0, 2.0),  # Gradient clipping value
                 'lr': trial.suggest_float('lr', 1e-4, 1e-1, log=True),  # Learning rate
-                'max_epochs': trial.suggest_int('max_epochs', 400, 1000),  # Maximum number of epochs
+                'max_epochs': trial.suggest_int('max_epochs', 700, 1000),  # Maximum number of epochs
                # 'patience': trial.suggest_int('patience', 10, 50),  # Early stopping patience
                 'batch_size': trial.suggest_categorical('batch_size', [256, 512, 1024, 2048]),  # Batch size
             }
@@ -94,7 +94,7 @@ class TabNetOptunaStrategy(Strategy):
                     tabnet = TabNetClassifier(
                      #   n_d=params['n_d'],
                      #   n_a=params['n_a'],
-                   #     n_steps=params['n_steps'],
+                     #   n_steps=params['n_steps'],
                      #   gamma=params['gamma'],
                      #   n_independent=params['n_independent'],
                      #   n_shared=params['n_shared'],
@@ -146,7 +146,7 @@ class TabNetOptunaStrategy(Strategy):
         self.model = TabNetClassifier(
         #    n_d=self.best_params['n_d'],
         #    n_a=self.best_params['n_a'],
-        #    n_steps=self.best_params['n_steps'],
+         #   n_steps=self.best_params['n_steps'],
         #    gamma=self.best_params['gamma'],
         #    n_independent=self.best_params['n_independent'],
         #    n_shared=self.best_params['n_shared'],
