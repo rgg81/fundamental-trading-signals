@@ -17,6 +17,8 @@ from catboost_strategy import CatBoostOptunaStrategy
 from tff_strategy import TemporalFusionTransformerOptunaStrategy
 from tabnet_strategy import TabNetOptunaStrategy
 from ngboost_strategy import NGBoostOptunaStrategy
+from gp_strategy import GaussianProcessOptunaStrategy
+from pytorch_nn_strategy import PyTorchNeuralNetOptunaStrategy
 
 # Set the output format for QuantStats
 qs.extend_pandas()
@@ -79,7 +81,11 @@ if __name__ == "__main__":
     # strategy = CatBoostOptunaStrategy()
     # strategy = TemporalFusionTransformerOptunaStrategy()
     # strategy = TabNetOptunaStrategy()
-    strategy = NGBoostOptunaStrategy()
+    # strategy = NGBoostOptunaStrategy()
+    #strategy = RidgeClassifierOptunaStrategy()
+    #strategy = GaussianProcessOptunaStrategy()
+    #strategy = LDAOptunaStrategy()
+    strategy = PyTorchNeuralNetOptunaStrategy()
     # strategy = EBMOptunaStrategy()
     # strategy = VotingEnsembleStrategy(
     #    voting_method='majority',

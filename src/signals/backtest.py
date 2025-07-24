@@ -26,6 +26,9 @@ class Backtest:
                 # Skip the first row since there's no past data
                 continue
 
+            #if current_data_frame.iloc[0]['Date'].year != 2017:
+            #    continue
+
             signal, amount = self.strategy.generate_signal(past_data, current_data_frame)
             if signal is None: continue
             profit_loss = 0

@@ -14,3 +14,5 @@ catboost>=1.2.0
 interpret>=0.5.0
 pytorch-tabnet>=4.0.0
 ngboost>=0.4.0
+torch>=2.0.0
+skorch>=0.15.0
