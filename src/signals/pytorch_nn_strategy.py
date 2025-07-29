@@ -53,7 +53,7 @@ class MLPNet(nn.Module):
         return self.network(x)
 
 class PyTorchNeuralNetOptunaStrategy(Strategy):
-    def __init__(self, n_trials=3, n_splits=8, random_state=42, balance_classes=True, balance_method='undersample'):
+    def __init__(self, n_trials=5, n_splits=8, random_state=42, balance_classes=True, balance_method='undersample'):
         self.n_trials = n_trials
         self.n_splits = n_splits
         self.random_state = random_state
@@ -204,7 +204,8 @@ class PyTorchNeuralNetOptunaStrategy(Strategy):
             n_layers = trial.suggest_int('n_layers', 1, 3)  # Max 3 layers
             hidden_dims = []
             for i in range(n_layers):
-                dim = trial.suggest_int(f'hidden_dim_{i}', 1, 5)
+                #dim = trial.suggest_int(f'hidden_dim_{i}', 1, 5)
+                dim = trial.suggest_int(f'hidden_dim_{i}', 1, 6)
                 hidden_dims.append(dim)
             
             # Training parameters optimized for small datasets

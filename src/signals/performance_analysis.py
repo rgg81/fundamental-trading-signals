@@ -40,8 +40,24 @@ def analyze_strategy_performance(strategy_results, benchmark_data=None, strategy
     --------
     None (displays performance metrics and plots)
     """
+    # Convert strategy returns to a pandas Series with DatetimeIndex
     result_array_series = strategy_results.set_index("Date")["Return"]
-    qs.reports.html(result_array_series, output='stats.html', title='My Backtest')
+    
+    # Calculate cumulative returns
+    cum_returns = qs.stats.compsum(result_array_series)
+    
+    # Generate full report
+    qs.reports.html(result_array_series, output='stats.html', title=f'{strategy_name} Performance Report')
+    
+    # Print some key metrics including cumulative returns
+    print(f"\n----- {strategy_name} Performance Metrics -----")
+    print(f"Cumulative Return: {cum_returns[-1]:.2%}")
+    print(f"CAGR: {qs.stats.cagr(result_array_series):.2%}")
+    print(f"Sharpe Ratio: {qs.stats.sharpe(result_array_series):.2f}")
+    print(f"Max Drawdown: {qs.stats.max_drawdown(result_array_series):.2%}")
+
+    return cum_returns[-1]
+    
 
 
 if __name__ == "__main__":
@@ -94,13 +110,31 @@ if __name__ == "__main__":
     #    random_state=42
     # )
 
-    backtest = Backtest(strategy, close_col='EURUSD_Close')
-    random_results = backtest.run(data)
-    
-    # Remove last row which might have incomplete data
-    random_results = random_results[:-1]
+    # run 100 times and get statistics about the result of analyzing the strategy performance
+    all_cum_returns = []
+    for i in range(100):
+        print(f"Running backtest iteration {i+1}/100")
+        backtest = Backtest(strategy, close_col='EURUSD_Close')
+        random_results = backtest.run(data)
         
-    random_results.to_csv("random_strategy_results.csv", index=False)
-    
-    # Analyze performance
-    analyze_strategy_performance(random_results, strategy_name="Random Strategy")
+        # Remove last row which might have incomplete data
+        random_results = random_results[:-1]
+        
+        # Save results to CSV
+        random_results.to_csv(f"random_strategy_results_{i+1}.csv", index=False)
+        
+        # Analyze performance
+        all_cum_returns.append(analyze_strategy_performance(random_results, strategy_name=f"Random Strategy Iteration {i+1}"))
+        # Print overall statistics
+        print(f"\n----- Overall Performance Metrics {i + 1} / 100  -----")
+        print(f"Mean Cumulative Return: {np.mean(all_cum_returns):.2%}")
+        print(f"Standard Deviation of Cumulative Returns: {np.std(all_cum_returns):.2%}")
+        print(f"Max Cumulative Return: {np.max(all_cum_returns):.2%}")
+        print(f"Min Cumulative Return: {np.min(all_cum_returns):.2%}")
+
+    # Print overall statistics
+    print("\n----- Overall Performance Metrics -----")
+    print(f"Mean Cumulative Return: {np.mean(all_cum_returns):.2%}")
+    print(f"Standard Deviation of Cumulative Returns: {np.std(all_cum_returns):.2%}")
+    print(f"Max Cumulative Return: {np.max(all_cum_returns):.2%}")
+    print(f"Min Cumulative Return: {np.min(all_cum_returns):.2%}")
