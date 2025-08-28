@@ -35,9 +35,9 @@ class HistGBOptunaStrategy(Strategy):
         def objective(trial):
             # Define the hyperparameter search space for HistGradientBoostingClassifier
             params = {
-                'max_iter': trial.suggest_int('max_iter', 50, 300),
+                'max_iter': trial.suggest_int('max_iter', 50, 500),
                 'learning_rate': trial.suggest_float('learning_rate', 0.01, 0.3, log=True),
-                'max_depth': trial.suggest_int('max_depth', 3, 10),
+                'max_depth': trial.suggest_int('max_depth', 1, 2),
                 'min_samples_leaf': trial.suggest_int('min_samples_leaf', 5, 50),
                 'max_leaf_nodes': trial.suggest_int('max_leaf_nodes', 10, 50),
                 'l2_regularization': trial.suggest_float('l2_regularization', 0.0, 10.0)

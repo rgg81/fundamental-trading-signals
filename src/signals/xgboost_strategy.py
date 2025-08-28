@@ -35,15 +35,17 @@ class XGBoostOptunaStrategy(Strategy):
         def objective(trial):
             # Define the hyperparameter search space for XGBoost
             params = {
-                'n_estimators': trial.suggest_int('n_estimators', 500, 5000, log=True),
-                'learning_rate': trial.suggest_float('learning_rate', 0.01, 0.3, log=True),
-                'max_depth': trial.suggest_int('max_depth', 1, 2),
+                'n_estimators': trial.suggest_int('n_estimators', 10, 50, log=True),
+                'learning_rate': trial.suggest_float('learning_rate', 0.1, 0.3, log=True),
+                'max_depth': trial.suggest_int('max_depth', 1, 5),
+                # different boosting types for xgboost
+                'booster': trial.suggest_categorical('booster', ['gbtree', 'gblinear', 'dart']),
                # 'min_child_weight': trial.suggest_int('min_child_weight', 1, 30),
-                'subsample': trial.suggest_float('subsample', 0.1, 1.0),
-                'colsample_bytree': trial.suggest_float('colsample_bytree', 0.1, 1.0),
-                'gamma': trial.suggest_float('gamma', 0.1, 10, log=True),
-                'reg_alpha': trial.suggest_float('reg_alpha', 0.1, 10, log=True),
-                'reg_lambda': trial.suggest_float('reg_lambda', 1, 10, log=True),
+               # 'subsample': trial.suggest_float('subsample', 0.9, 1.0),
+               # 'colsample_bytree': trial.suggest_float('colsample_bytree', 0.1, 1.0),
+              #  'gamma': trial.suggest_float('gamma', 0.1, 10, log=True),
+               # 'reg_alpha': trial.suggest_float('reg_alpha', 0.1, 10, log=True),
+               # 'reg_lambda': trial.suggest_float('reg_lambda', 1, 10, log=True),
                # 'random_state': self.random_state,
              #   'use_label_encoder': False,  # Prevents warning about label encoder
               #  'eval_metric': 'logloss'  # Required for newer versions of XGBoost
@@ -90,18 +92,6 @@ class XGBoostOptunaStrategy(Strategy):
         print("\nTop 10 most important features:")
         print(feature_importance.head(10))
         
-        # Additional feature importance visualization for XGBoost (gain-based)
-        try:
-            gain_importance = self.model.get_booster().get_score(importance_type='gain')
-            gain_importance_df = pd.DataFrame({
-                'Feature': list(gain_importance.keys()), 
-                'Gain': list(gain_importance.values())
-            }).sort_values('Gain', ascending=False)
-            
-            print("\nTop 10 features by gain importance:")
-            print(gain_importance_df.head(10))
-        except Exception as e:
-            print(f"Could not get gain-based feature importance: {e}")
 
     def generate_signal(self, past_data, current_data):
         # Clean input data

@@ -2,6 +2,7 @@ import os
 
 import pandas as pd
 from fredapi import Fred
+from sympy import series
 
 # Load API Key from environment variable or config file
 FRED_API_KEY = os.getenv("FRED_API_KEY")
@@ -21,6 +22,7 @@ FRED_SERIES = {
 }
 
 ONE_MONTH_MINUS_ONE_FRED_SERIES = ["EU_CPI", "EU_10Y_Yield", "US_CPI", "US_Core_CPI", "Fed_Funds_Rate"]
+LAG_FRED_SERIES = ["US_10Y_Yield", "VIX"]
 
 
 def fetch_fred_data(start_date="2000-01-01", end_date=None):
@@ -35,7 +37,15 @@ def fetch_fred_data(start_date="2000-01-01", end_date=None):
             df.index = pd.to_datetime(df.index)
 
             # Resample to get the last available value of each month
-            df = df.resample("ME").last()
+            df = df.resample("ME")
+            #df = df.last()
+            if name in LAG_FRED_SERIES:
+                def second_last_or_last(series):
+                    non_nan_values = series.dropna()
+                    return non_nan_values.iloc[-2]
+                df = df.agg(second_last_or_last)
+            else:
+                df = df.last()
             data[name] = df
         except Exception as e:
             print(f"Error fetching {name} ({series_id}): {e}")

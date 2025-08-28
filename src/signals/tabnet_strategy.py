@@ -11,7 +11,7 @@ import warnings
 warnings.filterwarnings('ignore')
 
 class TabNetOptunaStrategy(Strategy):
-    def __init__(self, n_trials=5, n_splits=5, random_state=42, use_gpu=True):
+    def __init__(self, n_trials=3, n_splits=5, random_state=42, use_gpu=True):
         self.n_trials = n_trials
         self.n_splits = n_splits
         self.random_state = random_state
@@ -72,8 +72,8 @@ class TabNetOptunaStrategy(Strategy):
               #  'lambda_sparse': trial.suggest_float('lambda_sparse', 1e-6, 1e-3, log=True),  # Sparsity regularization
               #  'momentum': trial.suggest_float('momentum', 0.01, 0.4),  # Momentum for batch normalization
               #  'clip_value': trial.suggest_float('clip_value', 1.0, 2.0),  # Gradient clipping value
-                'lr': trial.suggest_float('lr', 1e-4, 1e-1, log=True),  # Learning rate
-                'max_epochs': trial.suggest_int('max_epochs', 700, 1000),  # Maximum number of epochs
+                'lr': trial.suggest_float('lr', 1e-3, 1e-1, log=True),  # Learning rate
+                'max_epochs': trial.suggest_int('max_epochs', 100, 500),  # Maximum number of epochs
                # 'patience': trial.suggest_int('patience', 10, 50),  # Early stopping patience
                 'batch_size': trial.suggest_categorical('batch_size', [256, 512, 1024, 2048]),  # Batch size
             }

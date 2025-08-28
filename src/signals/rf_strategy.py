@@ -7,14 +7,13 @@ from sklearn.metrics import accuracy_score, classification_report
 from strategy import Strategy
 
 class RandomForestOptunaStrategy(Strategy):
-    def __init__(self, n_trials=35, n_splits=5, random_state=42, total_models=35):
+    def __init__(self, n_trials=10, n_splits=5, random_state=42):
         self.n_trials = n_trials
         self.n_splits = n_splits
         self.random_state = random_state
         self.model = None
         self.best_params = None
         self.fitted = False
-        self.total_models = total_models  # Number of models to train for majority voting
 
     def _clean_data(self, df):
         """Clean data by removing rows with NaN or infinity values"""
@@ -35,14 +34,14 @@ class RandomForestOptunaStrategy(Strategy):
         def objective(trial):
             # Define the hyperparameter search space for RandomForest
             params = {
-                'n_estimators': trial.suggest_int('n_estimators', 1, 30),
-                'max_depth': trial.suggest_int('max_depth', 1, 5),
-                'min_samples_split': trial.suggest_int('min_samples_split', 2, 20),
-                'min_samples_leaf': trial.suggest_int('min_samples_leaf', 1, 10),
-                'max_features': trial.suggest_categorical('max_features', ['sqrt', 'log2', None]),
+                'n_estimators': trial.suggest_int('n_estimators', 1, 5),
+                'max_depth': trial.suggest_int('max_depth', 1, 2),
+                #'min_samples_split': trial.suggest_int('min_samples_split', 2, 20),
+                #'min_samples_leaf': trial.suggest_int('min_samples_leaf', 1, 10),
+                'max_features': trial.suggest_categorical('max_features', [None]),
                 'bootstrap': True,
-                'max_samples': trial.suggest_float('max_samples', 0.1, 1.0),
-                'class_weight': trial.suggest_categorical('class_weight', ['balanced', 'balanced_subsample', None]),
+                #'max_samples': trial.suggest_float('max_samples', 0.1, 1.0),
+                #'class_weight': trial.suggest_categorical('class_weight', ['balanced', 'balanced_subsample', None]),
             }
             
             tscv = TimeSeriesSplit(n_splits=self.n_splits)
@@ -105,10 +104,9 @@ class RandomForestOptunaStrategy(Strategy):
         # Fit model
         # Reset the model every time we call generate_signal
         predictions = []
-        for _ in range(self.total_models):
-            self.model = None
-            self.fit(X, y)
-            predictions.append(self.model.predict(X_pred_clean)[0])
+        self.model = None
+        self.fit(X, y)
+        predictions.append(self.model.predict(X_pred_clean)[0])
         
         # Majority vote
         print(f"Predictions: {predictions}", flush=True)

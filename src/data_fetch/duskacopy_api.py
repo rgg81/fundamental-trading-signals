@@ -33,7 +33,7 @@ def download_symbol_data(symbol: str, start_date: datetime.datetime, end_date: d
         "-i", instrument,
         "-from", start_date.strftime('%Y-%m-%d'),
         "-to", end_date.strftime('%Y-%m-%d'),
-        "-t", "d1",
+        "-t", "h1",
         "-f", "csv",
         "-fn", output_file
     ], check=True)

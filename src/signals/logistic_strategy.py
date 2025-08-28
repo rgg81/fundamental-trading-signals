@@ -8,7 +8,7 @@ from sklearn.metrics import accuracy_score, classification_report
 from strategy import Strategy
 
 class LogisticRegressionOptunaStrategy(Strategy):
-    def __init__(self, n_trials=15, n_splits=5, random_state=42):
+    def __init__(self, n_trials=5, n_splits=5, random_state=42):
         self.n_trials = n_trials
         self.n_splits = n_splits
         self.random_state = random_state
@@ -57,11 +57,11 @@ class LogisticRegressionOptunaStrategy(Strategy):
         
         def objective(trial):
             # Define regularization approach
-            reg_type = trial.suggest_categorical('reg_type', ['none', 'l1', 'l2', 'elasticnet'])
+            reg_type = trial.suggest_categorical('reg_type', ['elasticnet'])
             
             # Base parameters
             params = {
-                'max_iter': trial.suggest_int('max_iter', 1000, 10000),
+                'max_iter': trial.suggest_int('max_iter', 400, 1000),
                 'class_weight': trial.suggest_categorical('class_weight', ['balanced', None]),
                 #'random_state': self.random_state,
                 'solver': 'saga',  # saga supports all penalties
@@ -74,7 +74,7 @@ class LogisticRegressionOptunaStrategy(Strategy):
                 params['penalty'] = reg_type
                 
                 # Inverse of regularization strength (higher C = less regularization)
-                params['C'] = trial.suggest_float('C', 1e-5, 100, log=True)
+                params['C'] = trial.suggest_float('C', 0.01, 1, log=True)
                 
                 # For elasticnet, tune the mix of L1 and L2
                 if reg_type == 'elasticnet':
@@ -115,7 +115,7 @@ class LogisticRegressionOptunaStrategy(Strategy):
         final_params = {
             'max_iter': self.best_params['max_iter'],
             'class_weight': self.best_params['class_weight'],
-            'random_state': self.random_state,
+            #'random_state': self.random_state,
             'solver': 'saga'
         }
         

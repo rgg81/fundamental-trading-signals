@@ -78,10 +78,10 @@ class NGBoostOptunaStrategy(Strategy):
         def objective(trial):
             # Define the hyperparameter search space for NGBoost
             params = {
-                'n_estimators': trial.suggest_int('n_estimators', 200, 1000),  # Reduced range
-                'learning_rate': trial.suggest_float('learning_rate', 0.001, 0.2, log=True),  # Reduced range
+                'n_estimators': trial.suggest_int('n_estimators', 5, 100),  # Reduced range
+                'learning_rate': trial.suggest_float('learning_rate', 0.001, 0.3, log=True),  # Reduced range
                # 'minibatch_frac': trial.suggest_float('minibatch_frac', 0.8, 1.0),  # Higher minibatch
-                'col_sample': trial.suggest_float('col_sample', 0.5, 1.0),  # Higher col_sample
+                'col_sample': trial.suggest_float('col_sample', 0.9, 1.0),  # Higher col_sample
                 #'tol': trial.suggest_float('tol', 1e-4, 1e-2, log=True),  # More lenient tolerance
                 #'random_state': self.random_state,
                 'verbose': False
@@ -89,12 +89,12 @@ class NGBoostOptunaStrategy(Strategy):
             
             # Tree-specific parameters - more conservative
             tree_params = {
-                'criterion': trial.suggest_categorical('criterion', ['friedman_mse']),  # More stable
-                'min_samples_split': trial.suggest_int('min_samples_split', 5, 20),  # Higher minimum
-                'min_samples_leaf': trial.suggest_int('min_samples_leaf', 3, 10),  # Higher minimum
-                'min_weight_fraction_leaf': trial.suggest_float('min_weight_fraction_leaf', 0.0, 0.1),  # Lower max
+                #'criterion': trial.suggest_categorical('criterion', ['friedman_mse']),  # More stable
+                #'min_samples_split': trial.suggest_int('min_samples_split', 5, 20),  # Higher minimum
+                #'min_samples_leaf': trial.suggest_int('min_samples_leaf', 3, 10),  # Higher minimum
+                #'min_weight_fraction_leaf': trial.suggest_float('min_weight_fraction_leaf', 0.0, 0.1),  # Lower max
                 'max_depth': trial.suggest_int('max_depth', 1, 2),  # Shallower trees
-                'max_features': trial.suggest_categorical('max_features', ['sqrt', 'log2'])  # Remove None
+                'max_features': trial.suggest_categorical('max_features', [None])  # Remove None
             }
             
             tscv = TimeSeriesSplit(n_splits=self.n_splits)

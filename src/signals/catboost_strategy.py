@@ -35,11 +35,11 @@ class CatBoostOptunaStrategy(Strategy):
         def objective(trial):
             # Define the hyperparameter search space for CatBoost
             params = {
-                'iterations': trial.suggest_int('iterations', 500, 10000, log=True),
-                'learning_rate': trial.suggest_float('learning_rate', 0.01, 0.3, log=True),
-                'depth': trial.suggest_int('depth', 2, 3),
-                'l2_leaf_reg': trial.suggest_float('l2_leaf_reg', 1.0, 100.0, log=True),
-                'subsample': trial.suggest_float('subsample', 0.5, 1.0),
+                'iterations': trial.suggest_int('iterations', 1, 5, log=True),
+                'learning_rate': trial.suggest_float('learning_rate', 0.1, 0.3, log=True),
+                'depth': trial.suggest_int('depth', 1, 3),
+              #  'l2_leaf_reg': trial.suggest_float('l2_leaf_reg', 1.0, 100.0, log=True),
+                'subsample': trial.suggest_float('subsample', 0.9, 1.0),
                 'verbose': False
             }
             

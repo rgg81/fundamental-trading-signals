@@ -8,7 +8,7 @@ from sklearn.preprocessing import StandardScaler
 from strategy import Strategy
 
 class GaussianNBOptunaStrategy(Strategy):
-    def __init__(self, n_trials=100, n_splits=5, random_state=42):
+    def __init__(self, n_trials=15, n_splits=5, random_state=42):
         self.n_trials = n_trials
         self.n_splits = n_splits
         self.random_state = random_state

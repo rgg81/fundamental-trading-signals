@@ -63,10 +63,10 @@ def analyze_strategy_performance(strategy_results, benchmark_data=None, strategy
 if __name__ == "__main__":
     # Example usage
         # Load price data
-    features = pd.read_csv("src/features/macro_features.csv", parse_dates=["Date"])
+    features = pd.read_csv("macro_features.csv", parse_dates=["Date"])
     features.set_index("Date", inplace=True)
     
-    data = pd.read_csv("src/data_fetch/EURUSD.csv")
+    data = pd.read_csv("EURUSD.csv")
     data['Date'] = pd.to_datetime(data['Date'])
 
     data.set_index("Date", inplace=True)
@@ -85,24 +85,22 @@ if __name__ == "__main__":
     # Create and run backtest with random strategy
     #strategy = RandomStrategy()
     #strategy = LGBMOptunaStrategy()
-    #strategy = MLPOptunaStrategy()
-    #strategy = LogisticRegressionOptunaStrategy()
-    #strategy = GaussianNBOptunaStrategy()
-    #strategy = KNNOptunaStrategy()
+    #strategy = MLPOptunaStrategy() NO GO
+    #strategy = LogisticRegressionOptunaStrategy() NO GO
+    #strategy = GaussianNBOptunaStrategy() NO GO
+    #strategy = KNNOptunaStrategy() NO GO
     #strategy = RandomForestOptunaStrategy()
-    # strategy = SVCOptunaStrategy()
-    # strategy = AdaBoostOptunaStrategy()
-    # strategy = HistGBOptunaStrategy()
-    # strategy = XGBoostOptunaStrategy()
-    # strategy = CatBoostOptunaStrategy()
-    # strategy = TemporalFusionTransformerOptunaStrategy()
-    # strategy = TabNetOptunaStrategy()
-    # strategy = NGBoostOptunaStrategy()
-    #strategy = RidgeClassifierOptunaStrategy()
+    #strategy = SVCOptunaStrategy() NO GO
+    strategy = AdaBoostOptunaStrategy()
+    #strategy = HistGBOptunaStrategy()
+    #strategy = XGBoostOptunaStrategy()
+    #strategy = CatBoostOptunaStrategy()
+    #strategy = TemporalFusionTransformerOptunaStrategy() NO GO
+    #strategy = TabNetOptunaStrategy() NO GO
+    #strategy = NGBoostOptunaStrategy()
     #strategy = GaussianProcessOptunaStrategy()
-    #strategy = LDAOptunaStrategy()
-    strategy = PyTorchNeuralNetOptunaStrategy()
-    # strategy = EBMOptunaStrategy()
+    #strategy = PyTorchNeuralNetOptunaStrategy() NO GO
+    #strategy = EBMOptunaStrategy()
     # strategy = VotingEnsembleStrategy(
     #    voting_method='majority',
     #    n_splits=5,
@@ -112,8 +110,8 @@ if __name__ == "__main__":
 
     # run 100 times and get statistics about the result of analyzing the strategy performance
     all_cum_returns = []
-    for i in range(100):
-        print(f"Running backtest iteration {i+1}/100")
+    for i in range(400):
+        print(f"Running backtest iteration {i+1}/400")
         backtest = Backtest(strategy, close_col='EURUSD_Close')
         random_results = backtest.run(data)
         
@@ -124,9 +122,9 @@ if __name__ == "__main__":
         random_results.to_csv(f"random_strategy_results_{i+1}.csv", index=False)
         
         # Analyze performance
-        all_cum_returns.append(analyze_strategy_performance(random_results, strategy_name=f"Random Strategy Iteration {i+1}"))
+        all_cum_returns.append(analyze_strategy_performance(random_results, strategy_name=f"Mean Cumulative Return: {np.mean(all_cum_returns):.2%} Strategy Iteration {i+1}"))
         # Print overall statistics
-        print(f"\n----- Overall Performance Metrics {i + 1} / 100  -----")
+        print(f"\n----- Overall Performance Metrics {i + 1} / 400 -----")
         print(f"Mean Cumulative Return: {np.mean(all_cum_returns):.2%}")
         print(f"Standard Deviation of Cumulative Returns: {np.std(all_cum_returns):.2%}")
         print(f"Max Cumulative Return: {np.max(all_cum_returns):.2%}")

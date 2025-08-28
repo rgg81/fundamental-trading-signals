@@ -53,7 +53,7 @@ class MLPNet(nn.Module):
         return self.network(x)
 
 class PyTorchNeuralNetOptunaStrategy(Strategy):
-    def __init__(self, n_trials=5, n_splits=8, random_state=42, balance_classes=True, balance_method='undersample'):
+    def __init__(self, n_trials=2, n_splits=8, random_state=42, balance_classes=True, balance_method='undersample'):
         self.n_trials = n_trials
         self.n_splits = n_splits
         self.random_state = random_state
@@ -201,24 +201,25 @@ class PyTorchNeuralNetOptunaStrategy(Strategy):
             # Simpler hyperparameter space for small datasets
             
             # Network architecture - smaller and simpler
-            n_layers = trial.suggest_int('n_layers', 1, 3)  # Max 3 layers
+            n_layers = trial.suggest_int('n_layers', 3, 5)  # Max 5 layers
             hidden_dims = []
             for i in range(n_layers):
                 #dim = trial.suggest_int(f'hidden_dim_{i}', 1, 5)
-                dim = trial.suggest_int(f'hidden_dim_{i}', 1, 6)
+                dim = trial.suggest_int(f'hidden_dim_{i}', 30, 64)
                 hidden_dims.append(dim)
+
             
             # Training parameters optimized for small datasets
             lr = trial.suggest_float('lr', 1e-3, 1e-1, log=True)
             batch_size = trial.suggest_categorical('batch_size', [64, 128, 256])  # Smaller batch sizes
-            dropout_rate = trial.suggest_float('dropout_rate', 0.1, 0.9)  # Higher dropout for regularization
+            dropout_rate = trial.suggest_float('dropout_rate', 0.5, 0.9)  # Higher dropout for regularization
             activation = trial.suggest_categorical('activation', ['relu', 'tanh', 'elu', 'leaky_relu', 'selu'])
             #activation = trial.suggest_categorical('activation', ['tanh'])
             weight_decay = trial.suggest_float('weight_decay', 1e-4, 1e-1, log=True)  # Stronger regularization
-            max_epochs = trial.suggest_int('max_epochs', 2, 30, log=True)  # Fewer epochs to prevent overfitting
+            max_epochs = trial.suggest_int('max_epochs', 39, 40, log=True)  # Fewer epochs to prevent overfitting
             
             # Feature selection - more aggressive for small datasets
-            use_feature_selection = trial.suggest_categorical('use_feature_selection', [True])
+            use_feature_selection = trial.suggest_categorical('use_feature_selection', [False])
             k_features = None
             if use_feature_selection:
                 # More aggressive feature selection for small datasets
@@ -339,8 +340,8 @@ class PyTorchNeuralNetOptunaStrategy(Strategy):
             X_selected = X_scaled
         
         # Build hidden dimensions from best params
-        n_layers = self.best_params['n_layers']
-        #n_layers = 1
+        #n_layers = self.best_params['n_layers']
+        n_layers = 1
         hidden_dims = [self.best_params[f'hidden_dim_{i}'] for i in range(n_layers)]
         
         # Create final model

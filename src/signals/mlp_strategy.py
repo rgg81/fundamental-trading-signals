@@ -8,7 +8,7 @@ from sklearn.preprocessing import StandardScaler
 from strategy import Strategy
 
 class MLPOptunaStrategy(Strategy):
-    def __init__(self, n_trials=15, n_splits=5, random_state=42):
+    def __init__(self, n_trials=5, n_splits=5, random_state=42):
         self.n_trials = n_trials
         self.n_splits = n_splits
         self.random_state = random_state
@@ -53,16 +53,16 @@ class MLPOptunaStrategy(Strategy):
         def objective(trial):
             params = {
                 'hidden_layer_sizes': (
-                    trial.suggest_int('hidden_layer_size1', 10, 100),
-                    trial.suggest_int('hidden_layer_size2', 5, 50),
+                    trial.suggest_int('hidden_layer_size1', 1, 6),
+                    trial.suggest_int('hidden_layer_size2', 1, 6),
                 ),
                 'activation': trial.suggest_categorical('activation', ['tanh', 'relu', 'logistic']),
                 'solver': trial.suggest_categorical('solver', ['adam', 'sgd', 'lbfgs']),
                 'alpha': trial.suggest_float('alpha', 1e-5, 1e-2, log=True),
                 'learning_rate': trial.suggest_categorical('learning_rate', ['constant', 'adaptive', 'invscaling']),
                 'learning_rate_init': trial.suggest_float('learning_rate_init', 1e-4, 1e-1, log=True),
-                'max_iter': trial.suggest_int('max_iter', 5, 50),
-                'early_stopping': True,
+                'max_iter': trial.suggest_int('max_iter', 1, 5),
+                'early_stopping': False,
                # 'random_state': self.random_state
             }
             
@@ -94,12 +94,6 @@ class MLPOptunaStrategy(Strategy):
             self.best_params.pop('hidden_layer_size2')
         )
         self.best_params['hidden_layer_sizes'] = hidden_layer_sizes
-        
-        # Add fixed parameters
-        self.best_params.update({
-            'early_stopping': True,
-            'random_state': self.random_state
-        })
         
         print(f"Best MLP parameters: {self.best_params}")
         

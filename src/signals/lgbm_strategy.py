@@ -7,10 +7,9 @@ from sklearn.metrics import accuracy_score, classification_report
 from strategy import Strategy
 
 class LGBMOptunaStrategy(Strategy):
-    def __init__(self, n_trials=30, n_splits=5, random_state=42):
+    def __init__(self, n_trials=30, n_splits=5):
         self.n_trials = n_trials
         self.n_splits = n_splits
-        self.random_state = random_state
         self.model = None
         self.best_params = None
         self.fitted = False
@@ -43,7 +42,7 @@ class LGBMOptunaStrategy(Strategy):
         study = optuna.create_study(direction='minimize')
         study.optimize(objective, n_trials=self.n_trials)
         self.best_params = study.best_params
-        self.best_params.update({'objective': 'binary', 'metric': 'binary_logloss', 'verbosity': -1, 'boosting_type': 'gbdt', 'seed': self.random_state})
+        self.best_params.update({'objective': 'binary', 'metric': 'binary_logloss', 'verbosity': -1, 'boosting_type': 'gbdt'})
         self.model = lgb.LGBMClassifier(**self.best_params)
         self.model.fit(X, y)
         self.fitted = True

@@ -230,12 +230,12 @@ class TemporalFusionTransformerOptunaStrategy(Strategy):
         def objective(trial):
             # Define the hyperparameter search space for DeepAR
             params = {
-                'hidden_size': trial.suggest_int('hidden_size', 16, 100),
+                'hidden_size': trial.suggest_int('hidden_size', 2, 5),
                 #'rnn_layers': trial.suggest_int('rnn_layers', 5, 10),
-                'dropout': trial.suggest_float('dropout', 0.1, 0.3),
-                'learning_rate': trial.suggest_float('learning_rate', 1e-3, 1e-1, log=True),
-                'batch_size': trial.suggest_categorical('batch_size', [16, 32, 64]),
-                'max_epochs': trial.suggest_int('max_epochs', 20, 50, step=10),
+                'dropout': trial.suggest_float('dropout', 0.1, 0.2),
+                'learning_rate': trial.suggest_float('learning_rate', 1e-2, 1e-1, log=True),
+                'batch_size': trial.suggest_categorical('batch_size', [128, 256]),
+                'max_epochs': trial.suggest_int('max_epochs', 5, 10, step=1),
             }
             
             # Define DeepAR model with the trial parameters

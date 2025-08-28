@@ -52,14 +52,23 @@ def generate_features(df):
     df = add_volatility_features(df, VOLATILITY_FEATURES, VOLATILITY_WINDOWS)
 
     # Drop rows with NaNs introduced by feature generation
-    df = df.dropna()
+    # Analyze NaN values before removal
+    print("\n=== NaN Analysis Before Removal ===")
+    print(df[df.isna().any(axis=1)])
+    
+    #df = df.dropna()
+    print(f"\nAfter dropping NaNs: {len(df)} rows remaining")
+    if len(df) > 0:
+        print(f"New date range: {df.index.min()} to {df.index.max()}")
+        print(f"New first row (index 0): {df.index[0]}")
+        print(f"New last row (index {len(df)-1}): {df.index[-1]}")
 
     return df
 
 
 if __name__ == "__main__":
     # Example: Load macroeconomic data
-    df = pd.read_csv("../data_fetch/macro_data.csv", parse_dates=["Date"], index_col="Date")
+    df = pd.read_csv("macro_data.csv", parse_dates=["Date"], index_col="Date")
 
     # Generate features
     df_features = generate_features(df)
