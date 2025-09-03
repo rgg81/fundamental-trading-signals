@@ -19,6 +19,7 @@ from tabnet_strategy import TabNetOptunaStrategy
 from ngboost_strategy import NGBoostOptunaStrategy
 from gp_strategy import GaussianProcessOptunaStrategy
 from pytorch_nn_strategy import PyTorchNeuralNetOptunaStrategy
+from ensemble_strategy import EnsembleOptunaStrategy
 
 # Set the output format for QuantStats
 qs.extend_pandas()
@@ -63,6 +64,7 @@ def analyze_strategy_performance(strategy_results, benchmark_data=None, strategy
 if __name__ == "__main__":
     # Example usage
         # Load price data
+    #features = pd.read_csv("macro_features.csv", parse_dates=["Date"])
     features = pd.read_csv("macro_features.csv", parse_dates=["Date"])
     features.set_index("Date", inplace=True)
     
@@ -91,7 +93,7 @@ if __name__ == "__main__":
     #strategy = KNNOptunaStrategy() NO GO
     #strategy = RandomForestOptunaStrategy()
     #strategy = SVCOptunaStrategy() NO GO
-    strategy = AdaBoostOptunaStrategy()
+    #strategy = AdaBoostOptunaStrategy()
     #strategy = HistGBOptunaStrategy()
     #strategy = XGBoostOptunaStrategy()
     #strategy = CatBoostOptunaStrategy()
@@ -100,6 +102,7 @@ if __name__ == "__main__":
     #strategy = NGBoostOptunaStrategy()
     #strategy = GaussianProcessOptunaStrategy()
     #strategy = PyTorchNeuralNetOptunaStrategy() NO GO
+    strategy = EnsembleOptunaStrategy()
     #strategy = EBMOptunaStrategy()
     # strategy = VotingEnsembleStrategy(
     #    voting_method='majority',

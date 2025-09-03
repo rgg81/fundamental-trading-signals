@@ -15,31 +15,25 @@ class XGBoostOptunaStrategy(Strategy):
         self.best_params = None
         self.fitted = False
 
-    def _clean_data(self, df):
-        """Clean data by removing rows with NaN or infinity values"""
-        # Make a copy to avoid modifying the original data
-        df_clean = df.copy()
-        
-        # Remove rows with infinity values
-        df_clean = df_clean[~df_clean.isin([np.inf, -np.inf]).any(axis=1)]
-        
-        # Remove rows with NaN values
-        df_clean = df_clean.dropna()
-        
-        return df_clean
 
     def fit(self, X, y):
         # Clean data to handle infinities
-        X_clean = self._clean_data(X)
         
         def objective(trial):
+            # Calculate class balance ratio
+            negative_count = (y == 0).sum()
+            positive_count = (y == 1).sum()
+            scale_pos_weight = negative_count / positive_count if positive_count > 0 else 1.0
+            
             # Define the hyperparameter search space for XGBoost
             params = {
                 'n_estimators': trial.suggest_int('n_estimators', 10, 50, log=True),
                 'learning_rate': trial.suggest_float('learning_rate', 0.1, 0.3, log=True),
-                'max_depth': trial.suggest_int('max_depth', 1, 5),
+                'max_depth': trial.suggest_int('max_depth', 4, 5),
                 # different boosting types for xgboost
                 'booster': trial.suggest_categorical('booster', ['gbtree', 'gblinear', 'dart']),
+                # Handle class imbalance
+                'scale_pos_weight': scale_pos_weight,
                # 'min_child_weight': trial.suggest_int('min_child_weight', 1, 30),
                # 'subsample': trial.suggest_float('subsample', 0.9, 1.0),
                # 'colsample_bytree': trial.suggest_float('colsample_bytree', 0.1, 1.0),
@@ -53,8 +47,8 @@ class XGBoostOptunaStrategy(Strategy):
             
             tscv = TimeSeriesSplit(n_splits=self.n_splits)
             scores = []
-            for train_idx, val_idx in tscv.split(X_clean):
-                X_train, X_val = X_clean.iloc[train_idx], X_clean.iloc[val_idx]
+            for train_idx, val_idx in tscv.split(X):
+                X_train, X_val = X.iloc[train_idx], X.iloc[val_idx]
                 y_train, y_val = y.iloc[train_idx], y.iloc[val_idx]
                 
                 try:
@@ -76,16 +70,16 @@ class XGBoostOptunaStrategy(Strategy):
         
         # Train the final model with best parameters
         self.model = XGBClassifier(**self.best_params)
-        self.model.fit(X_clean, y)
+        self.model.fit(X, y)
         self.fitted = True
         
         # Evaluate on training data
-        preds = self.model.predict(X_clean)
+        preds = self.model.predict(X)
         print("Classification Report:\n", classification_report(y, preds))
 
         # Feature importance for XGBoost
         feature_importance = pd.DataFrame({
-            'Feature': X_clean.columns,
+            'Feature': X.columns,
             'Importance': self.model.feature_importances_
         }).sort_values('Importance', ascending=False)
         
@@ -94,9 +88,9 @@ class XGBoostOptunaStrategy(Strategy):
         
 
     def generate_signal(self, past_data, current_data):
-        # Clean input data
-        past_data = self._clean_data(past_data)
-        current_data = self._clean_data(current_data)
+        # Remove inf data
+        past_data = past_data.replace([np.inf, -np.inf], np.nan).dropna()
+        current_data = current_data.replace([np.inf, -np.inf], np.nan).dropna()
 
         if current_data.empty:
             return None, 10
@@ -114,14 +108,11 @@ class XGBoostOptunaStrategy(Strategy):
         # X_pred should be the same features as X
         X_pred = current_data.drop(columns=columns_to_drop)
         
-        # Clean prediction data
-        X_pred_clean = self._clean_data(X_pred)
-        
         # Predict
-        pred = self.model.predict(X_pred_clean)[0]
+        pred = self.model.predict(X_pred)[0]
         
         # Get prediction probabilities
-        pred_probs = self.model.predict_proba(X_pred_clean)[0]
+        pred_probs = self.model.predict_proba(X_pred)[0]
         print(f"Prediction probabilities: Class 0: {pred_probs[0]:.4f}, Class 1: {pred_probs[1]:.4f}")
         
         return int(pred), 10  # signal, amount
