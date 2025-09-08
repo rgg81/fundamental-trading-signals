@@ -65,7 +65,7 @@ if __name__ == "__main__":
     # Example usage
         # Load price data
     #features = pd.read_csv("macro_features.csv", parse_dates=["Date"])
-    features = pd.read_csv("economic_indicators_features.csv", parse_dates=["Date"])
+    features = pd.read_csv("technical_indicators_features.csv", parse_dates=["Date"])
     features.set_index("Date", inplace=True)
     
     data = pd.read_csv("EURUSD.csv")
