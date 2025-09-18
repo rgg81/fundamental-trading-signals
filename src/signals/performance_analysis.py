@@ -64,9 +64,9 @@ def analyze_strategy_performance(strategy_results, benchmark_data=None, strategy
 if __name__ == "__main__":
     # Example usage
         # Load price data
-    #features = pd.read_csv("macro_features.csv", parse_dates=["Date"])
-    features = pd.read_csv("technical_indicators_features.csv", parse_dates=["Date"])
-    features.set_index("Date", inplace=True)
+    features_macro = pd.read_csv("macro_features.csv", parse_dates=["Date"])
+    #features = pd.read_csv("technical_indicators_features.csv", parse_dates=["Date"])
+    features_macro.set_index("Date", inplace=True)
     
     data = pd.read_csv("EURUSD.csv")
     data['Date'] = pd.to_datetime(data['Date'])
@@ -76,17 +76,55 @@ if __name__ == "__main__":
     price_returns = price.pct_change().dropna()
     labels = price_returns.apply(lambda x: 1 if x > 0 else 0)
     # merge price and labels by date index
-    features = features.join(price.rename("EURUSD_Close"), how="inner")
-    data = features.join(labels.rename("Label"), how="inner")
+    features_macro = features_macro.join(price.rename("EURUSD_Close"), how="inner")
+    data = features_macro.join(labels.rename("Label"), how="inner")
     # make index Date as a column Date
-    data.reset_index(inplace=True)
-    # merge 
+    
+    # rename all the features columns to have prefix macro_ except ['Label', 'Date', 'EURUSD_Close']
+    data.rename(columns=lambda x: f"macro_{x}" if x != "Date" and x != "Label" and x != "EURUSD_Close" else x, inplace=True)
 
+    # read economic indicators features
+    features_economic = pd.read_csv("economic_indicators_features.csv", parse_dates=["Date"])
+    features_economic.set_index("Date", inplace=True)
+    # rename all the features columns to have prefix econ_ except ['Label', 'Date', 'EURUSD_Close']
+    features_economic.rename(columns=lambda x: f"econ_{x}" if x != "Date" and x != "Label" and x != "EURUSD_Close"
+                                else x, inplace=True)
+    # outer join economic indicators features with data by Date
+    data = data.join(features_economic, how="inner")
+
+    # read technical indicators features
+    features_technical = pd.read_csv("technical_indicators_features.csv", parse_dates=["Date"])
+    features_technical.set_index("Date", inplace=True)
+    # rename all the features columns to have prefix tech_ except ['Label', 'Date', 'EURUSD_Close']
+    features_technical.rename(columns=lambda x: f"tech_{x}" if x != "Date" and x != "Label" and x != "EURUSD_Close"
+                                else x, inplace=True)
+    # outer join technical indicators features with data by Date
+    data = data.join(features_technical, how="inner")
+
+    # read mean_reversion features
+    features_mean_reversion = pd.read_csv("mean_reversion_features.csv", parse_dates=["Date"])
+    features_mean_reversion.set_index("Date", inplace=True)
+    # rename all the features columns to have prefix mr_ except ['Label', 'Date', 'EURUSD_Close']
+    features_mean_reversion.rename(columns=lambda x: f"mr_{x}" if x != "Date" and x != "Label" and x != "EURUSD_Close"
+                                else x, inplace=True)
+    # outer join mean_reversion features with data by Date
+    data = data.join(features_mean_reversion, how="inner")
+
+    # read spread features
+    features_spread = pd.read_csv("spread_features.csv", parse_dates=["Date"])
+    features_spread.set_index("Date", inplace=True)
+    # rename all the features columns to have prefix spread_ except ['Label', 'Date', 'EURUSD_Close']
+    features_spread.rename(columns=lambda x: f"spread_{x}" if x != "Date" and x != "Label" and x != "EURUSD_Close"
+                                else x, inplace=True)
+    # outer join spread features with data by Date
+    data = data.join(features_spread, how="inner")
+
+    data.reset_index(inplace=True)
 
     
     # Create and run backtest with random strategy
     #strategy = RandomStrategy()
-    #strategy = LGBMOptunaStrategy()
+    strategy = LGBMOptunaStrategy(feature_set="spread_")
     #strategy = MLPOptunaStrategy() NO GO
     #strategy = LogisticRegressionOptunaStrategy() NO GO
     #strategy = GaussianNBOptunaStrategy() NO GO
@@ -102,7 +140,7 @@ if __name__ == "__main__":
     #strategy = NGBoostOptunaStrategy()
     #strategy = GaussianProcessOptunaStrategy()
     #strategy = PyTorchNeuralNetOptunaStrategy() NO GO
-    strategy = EnsembleOptunaStrategy()
+    #strategy = EnsembleOptunaStrategy(feature_set=None)
     #strategy = EBMOptunaStrategy()
     # strategy = VotingEnsembleStrategy(
     #    voting_method='majority',

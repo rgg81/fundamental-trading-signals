@@ -21,15 +21,21 @@ class EnsembleOptunaStrategy(Strategy):
     NGBoostOptunaStrategy, and GaussianProcessOptunaStrategy.
     """
     
-    def __init__(self, max_amount=10):
+    def __init__(self, max_amount=10, feature_set=None):
         self.max_amount = max_amount
         self.strategies = {}
         self.fitted = False
-        
+        self.feature_set = feature_set
+
         # Initialize all strategies
-        # Initialize all strategies
-        for i in range(1, 100):
-            self.strategies[f'LGBM_{i}'] = LGBMOptunaStrategy()
+     #   for i in range(1, 202):
+     #       self.strategies[f'LGBM_{i}'] = LGBMOptunaStrategy(feature_set="macro_")
+     #   for i in range(202, 404):
+     #       self.strategies[f'LGBM_{i}'] = LGBMOptunaStrategy(feature_set="tech_")
+     #   for i in range(404, 606):
+     #       self.strategies[f'LGBM_{i}'] = LGBMOptunaStrategy(feature_set="econ_")
+        for i in range(606, 808):
+            self.strategies[f'LGBM_{i}'] = LGBMOptunaStrategy(feature_set="mr_")
         
         print(f"Ensemble Strategy initialized with {len(self.strategies)} strategies")
 
@@ -93,14 +99,22 @@ class EnsembleOptunaStrategy(Strategy):
         """Generate ensemble signal from all strategies"""
         # Prepare data for fitting if not already fitted
         print(f"\n--- Ensemble Prediction ---")
-        
+        # include ['Label', 'Date', 'EURUSD_Close'] in features_columns
+        if self.feature_set is None:
+            feature_columns = past_data.columns
+        else:
+            feature_columns = [col for col in past_data.columns if col.startswith(self.feature_set)]
+            feature_columns.extend(['Label', 'Date', 'EURUSD_Close'])
+        # print feature_columns with some explanation
+        print(f"Feature columns for prediction: {feature_columns}")
+
         # Get predictions from all strategies
         strategy_predictions = {}
         
         for name, strategy in self.strategies.items():
             try:
                 # Each strategy will call its own fit method in generate_signal
-                signal, amount = strategy.generate_signal(past_data, current_data)
+                signal, amount = strategy.generate_signal(past_data[feature_columns], current_data[feature_columns])
                 strategy_predictions[name] = {'signal': signal, 'amount': amount}
                 print(f"{name}: Signal={signal}, Amount={amount}")
                 

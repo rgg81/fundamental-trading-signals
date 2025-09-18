@@ -7,12 +7,13 @@ from sklearn.metrics import accuracy_score, classification_report
 from strategy import Strategy
 
 class LGBMOptunaStrategy(Strategy):
-    def __init__(self, n_trials=30, n_splits=5):
+    def __init__(self, n_trials=30, n_splits=5, feature_set="macro_"):
         self.n_trials = n_trials
         self.n_splits = n_splits
         self.model = None
         self.best_params = None
         self.fitted = False
+        self.feature_set = feature_set
 
     def fit(self, X, y):
         def objective(trial):
@@ -50,8 +51,15 @@ class LGBMOptunaStrategy(Strategy):
         print("Classification Report:\n", classification_report(y, preds))
 
     def generate_signal(self, past_data, current_data):
+        feature_columns = [col for col in past_data.columns if col.startswith(self.feature_set)]
+        feature_columns.extend(['Label', 'Date', 'EURUSD_Close'])
+        # print feature_columns with some explanation
+        print(f"Feature columns for prediction: {feature_columns}")
         # X all data frame less Label, Date and Close
         columns_to_drop = ['Label', 'Date', 'EURUSD_Close']
+        past_data = past_data[feature_columns]
+        current_data = current_data[feature_columns]
+
         X = past_data.drop(columns=columns_to_drop)
         # y only Label
         y = past_data['Label']
