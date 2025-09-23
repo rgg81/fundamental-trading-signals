@@ -119,12 +119,21 @@ if __name__ == "__main__":
     # outer join spread features with data by Date
     data = data.join(features_spread, how="inner")
 
+    # read spread advanced features
+    features_spread_advanced = pd.read_csv("spread_features_advanced.csv", parse_dates=["Date"])
+    features_spread_advanced.set_index("Date", inplace=True)
+    # rename all the features columns to have prefix spread_ except ['Label', 'Date', 'EURUSD_Close']
+    features_spread_advanced.rename(columns=lambda x: f"spreadadv_{x}" if x != "Date" and x != "Label" and x != "EURUSD_Close"
+                                else x, inplace=True)
+    # outer join spread advanced features with data by Date
+    data = data.join(features_spread_advanced, how="inner")
+
     data.reset_index(inplace=True)
 
     
     # Create and run backtest with random strategy
     #strategy = RandomStrategy()
-    strategy = LGBMOptunaStrategy(feature_set="spread_")
+    #strategy = LGBMOptunaStrategy(feature_set="spreadadv_")
     #strategy = MLPOptunaStrategy() NO GO
     #strategy = LogisticRegressionOptunaStrategy() NO GO
     #strategy = GaussianNBOptunaStrategy() NO GO
@@ -140,7 +149,7 @@ if __name__ == "__main__":
     #strategy = NGBoostOptunaStrategy()
     #strategy = GaussianProcessOptunaStrategy()
     #strategy = PyTorchNeuralNetOptunaStrategy() NO GO
-    #strategy = EnsembleOptunaStrategy(feature_set=None)
+    strategy = EnsembleOptunaStrategy(feature_set=None)
     #strategy = EBMOptunaStrategy()
     # strategy = VotingEnsembleStrategy(
     #    voting_method='majority',

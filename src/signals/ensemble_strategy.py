@@ -34,9 +34,13 @@ class EnsembleOptunaStrategy(Strategy):
      #       self.strategies[f'LGBM_{i}'] = LGBMOptunaStrategy(feature_set="tech_")
      #   for i in range(404, 606):
      #       self.strategies[f'LGBM_{i}'] = LGBMOptunaStrategy(feature_set="econ_")
-        for i in range(606, 808):
-            self.strategies[f'LGBM_{i}'] = LGBMOptunaStrategy(feature_set="mr_")
-        
+     #   for i in range(606, 808):
+     #       self.strategies[f'LGBM_{i}'] = LGBMOptunaStrategy(feature_set="mr_")
+     #   for i in range(808, 1010):
+     #       self.strategies[f'LGBM_{i}'] = LGBMOptunaStrategy(feature_set="spread_")
+        for i in range(1010, 1011):
+            self.strategies[f'LGBM_{i}'] = LGBMOptunaStrategy(feature_set="spreadadv_")
+
         print(f"Ensemble Strategy initialized with {len(self.strategies)} strategies")
 
     def _aggregate_predictions(self, predictions):

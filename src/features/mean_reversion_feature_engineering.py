@@ -314,19 +314,7 @@ class MeanReversionFeatureEngineering:
             
             features[f'Bullish_Divergence_{period}'] = bullish_divergence
             features[f'Bearish_Divergence_{period}'] = bearish_divergence
-            
-            # 6. Channel Trading Signals
-            # Upper and lower channel boundaries using linear regression
-            x = np.arange(period)
-            price_values = df['Close'].rolling(period).apply(
-                lambda y: np.polyfit(x, y, 1)[0] if len(y) == period else np.nan, raw=True
-            )
-            
-            # Price at channel extremes
-            bb_width = (bb_high - bb_low) / sma if 'bb_high' in locals() else \
-                      (ta.volatility.bollinger_hband(df['Close'], window=period) - 
-                       ta.volatility.bollinger_lband(df['Close'], window=period)) / sma
-            
+        
             features[f'Channel_Top_{period}'] = ((df['Close'] - sma) / sma > 0.01).astype(int)
             features[f'Channel_Bottom_{period}'] = ((sma - df['Close']) / sma > 0.01).astype(int)
         
