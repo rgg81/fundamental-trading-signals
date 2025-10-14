@@ -73,11 +73,12 @@ if __name__ == "__main__":
 
     data.set_index("Date", inplace=True)
     price = data["EURUSD_Close"]
-    price_returns = price.pct_change().dropna()
+    # percentage returns of next period
+    price_returns = (price.shift(-1) - price) / price
     labels = price_returns.apply(lambda x: 1 if x > 0 else 0)
     # merge price and labels by date index
     features_macro = features_macro.join(price.rename("EURUSD_Close"), how="inner")
-    data = features_macro.join(labels.rename("Label"), how="inner")
+    data = features_macro
     # make index Date as a column Date
     
     # rename all the features columns to have prefix macro_ except ['Label', 'Date', 'EURUSD_Close']
@@ -128,12 +129,23 @@ if __name__ == "__main__":
     # outer join spread advanced features with data by Date
     data = data.join(features_spread_advanced, how="inner")
 
+    # read regime detection features
+    features_regime = pd.read_csv("regime_detection_features.csv", parse_dates=["Date"])
+    features_regime.set_index("Date", inplace=True)
+    # rename all the features columns to have prefix regime_ except ['Label', 'Date', 'EURUSD_Close']
+    features_regime.rename(columns=lambda x: f"regime_{x}" if x != "Date" and x != "Label" and x != "EURUSD_Close"
+                                else x, inplace=True)
+    # outer join regime detection features with data by Date
+    data = data.join(features_regime, how="inner")
+
     data.reset_index(inplace=True)
+
+    #data.drop("Label_delete", axis=1, inplace=True)
 
     
     # Create and run backtest with random strategy
     #strategy = RandomStrategy()
-    #strategy = LGBMOptunaStrategy(feature_set="spreadadv_")
+    strategy = LGBMOptunaStrategy(feature_set="macro_")
     #strategy = MLPOptunaStrategy() NO GO
     #strategy = LogisticRegressionOptunaStrategy() NO GO
     #strategy = GaussianNBOptunaStrategy() NO GO
@@ -149,7 +161,7 @@ if __name__ == "__main__":
     #strategy = NGBoostOptunaStrategy()
     #strategy = GaussianProcessOptunaStrategy()
     #strategy = PyTorchNeuralNetOptunaStrategy() NO GO
-    strategy = EnsembleOptunaStrategy(feature_set=None)
+    #strategy = EnsembleOptunaStrategy(feature_set=None)
     #strategy = EBMOptunaStrategy()
     # strategy = VotingEnsembleStrategy(
     #    voting_method='majority',

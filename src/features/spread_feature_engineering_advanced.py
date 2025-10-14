@@ -136,38 +136,39 @@ class AdvancedSpreadFeatureEngineering:
                     lookback_window = window * 4  # Extended lookback for better rank context
                     
                     # 1. Basic Percentile Rank (foundational)
-                    rolling_rank = df[feature].rolling(window=lookback_window, min_periods=window).rank(pct=True)
-                    df[f"{feature}_pct_rank_{window}"] = rolling_rank
+                    #rolling_rank = df[feature].rolling(window=window).rank(pct=True)
+                    #df[f"{feature}_pct_rank_{window}"] = rolling_rank
                     
-                    # 2. Trend-Based Ranks
-                    # Velocity rank: rank of rate of change
+                    ## 2. Trend-Based Ranks
+                    ## Velocity rank: rank of rate of change
                     velocity = df[feature].pct_change(periods=window//2)
                     df[f"{feature}_velocity_rank_{window}"] = velocity.rolling(window=lookback_window, min_periods=window).rank(pct=True)
                     
-                    # Acceleration rank: rank of change in velocity  
+                    ## Acceleration rank: rank of change in velocity  
                     acceleration = velocity.diff(periods=window//3)
                     df[f"{feature}_accel_rank_{window}"] = acceleration.rolling(window=lookback_window, min_periods=window).rank(pct=True)
                     
-                    # Trend strength rank: rank based on how consistently trending
+                    ## Trend strength rank: rank based on how consistently trending
                     trend_consistency = df[feature].rolling(window=window).apply(
-                        lambda x: len([i for i in range(1, len(x)) if (x.iloc[i] - x.iloc[i-1]) * (x.iloc[-1] - x.iloc[0]) > 0]) / max(1, len(x)-1)
+                       lambda x: len([i for i in range(1, len(x)) if (x.iloc[i] - x.iloc[i-1]) * (x.iloc[-1] - x.iloc[0]) > 0]) / max(1, len(x)-1)
                     )
                     df[f"{feature}_trend_strength_rank_{window}"] = trend_consistency.rolling(window=lookback_window, min_periods=window).rank(pct=True)
                     
                     # 3. Mean Reversion Ranks
                     # Deviation from mean rank: how far from historical average
-                    rolling_mean = df[feature].rolling(window=lookback_window, min_periods=window).mean()
-                    mean_deviation = (df[feature] - rolling_mean) / (df[feature].rolling(window=lookback_window, min_periods=window).std() + 1e-8)
-                    df[f"{feature}_mean_dev_rank_{window}"] = mean_deviation.rolling(window=lookback_window, min_periods=window).rank(pct=True)
+                    #rolling_mean_long = df[feature].rolling(window=3*window).mean()
+                    #rolling_mean = df[feature].rolling(window=window).mean()
+                    #mean_deviation = (rolling_mean / rolling_mean_long)
+                    #df[f"{feature}_mean_dev_rank_{window}"] = mean_deviation
                     
                     # Reversion probability rank: likelihood of mean reversion
-                    distance_from_mean = np.abs(df[feature] - rolling_mean)
-                    df[f"{feature}_reversion_prob_rank_{window}"] = distance_from_mean.rolling(window=lookback_window, min_periods=window).rank(pct=True)
-                    
+                    #distance_from_mean = np.abs(df[feature] - rolling_mean)
+                    #df[f"{feature}_reversion_prob_rank_{window}"] = distance_from_mean.rolling(window=window, min_periods=window).rank(pct=True)
+
                     # Volatility-adjusted rank: current position relative to volatility-adjusted historical range
-                    rolling_std = df[feature].rolling(window=lookback_window, min_periods=window).std()
-                    vol_adj_position = (df[feature] - rolling_mean) / (rolling_std + 1e-8)
-                    df[f"{feature}_vol_adj_rank_{window}"] = vol_adj_position.rolling(window=lookback_window, min_periods=window).rank(pct=True)
+                    #rolling_std = df[feature].rolling(window=lookback_window, min_periods=window).std()
+                    #vol_adj_position = (df[feature] - rolling_mean) / (rolling_std + 1e-8)
+                    #df[f"{feature}_vol_adj_rank_{window}"] = vol_adj_position.rolling(window=lookback_window, min_periods=window).rank(pct=True)
                     
                     # 4. Momentum Persistence Ranks
                     # Momentum streak rank: rank based on consecutive directional moves
@@ -175,7 +176,7 @@ class AdvancedSpreadFeatureEngineering:
                     momentum_streaks = []
                     current_streak = 0
                     last_direction = 0
-                    
+
                     for change in price_changes:
                         if pd.isna(change):
                             momentum_streaks.append(np.nan)
@@ -191,71 +192,77 @@ class AdvancedSpreadFeatureEngineering:
                         last_direction = direction
                     
                     df[f"{feature}_momentum_streak_{window}"] = pd.Series(momentum_streaks, index=df.index)
-                    df[f"{feature}_momentum_rank_{window}"] = df[f"{feature}_momentum_streak_{window}"].rolling(window=lookback_window, min_periods=window).rank(pct=True)
+                    df[f"{feature}_momentum_rank_{window}"] = df[f"{feature}_momentum_streak_{window}"].rolling(window=window).rank(pct=True)
                     
-                    # 5. Regime-Based Ranks
-                    # High/Low regime rank: position within recent high/low range
-                    rolling_high = df[feature].rolling(window=lookback_window, min_periods=window).max()
-                    rolling_low = df[feature].rolling(window=lookback_window, min_periods=window).min()
-                    regime_position = (df[feature] - rolling_low) / (rolling_high - rolling_low + 1e-8)
-                    df[f"{feature}_regime_rank_{window}"] = regime_position
+                    # # 5. Regime-Based Ranks
+                    # # High/Low regime rank: position within recent high/low range
+                    #rolling_high = df[feature].rolling(window=lookback_window, min_periods=window).max()
+                    #rolling_low = df[feature].rolling(window=lookback_window, min_periods=window).min()
+                    #regime_position = (df[feature] - rolling_low) / (rolling_high - rolling_low + 1e-8)
+                    #df[f"{feature}_regime_rank_{window}"] = regime_position
                     
-                    # Volatility regime rank: current volatility vs historical volatility distribution
-                    vol_window = max(2, window//2)  # Ensure minimum window of 2
-                    current_vol = df[feature].rolling(window=vol_window, min_periods=2).std()
-                    df[f"{feature}_vol_regime_rank_{window}"] = current_vol.rolling(window=lookback_window, min_periods=window).rank(pct=True)
+                    # # Volatility regime rank: current volatility vs historical volatility distribution
+                    #vol_window = max(2, window//2)  # Ensure minimum window of 2
+                    #current_vol = df[feature].rolling(window=vol_window, min_periods=2).std()
+                    #df[f"{feature}_vol_regime_rank_{window}"] = current_vol.rolling(window=lookback_window, min_periods=window).rank(pct=True)
                     
-                    # 6. Cross-Temporal Ranks
-                    # Multi-timeframe rank: average rank across different windows
-                    short_window = max(2, window//2)  # Ensure minimum window of 2
-                    short_rank = df[feature].rolling(window=short_window, min_periods=max(1, short_window//2)).rank(pct=True)
-                    medium_rank = df[feature].rolling(window=window, min_periods=max(1, window//2)).rank(pct=True)
-                    long_rank = df[feature].rolling(window=window*2, min_periods=window).rank(pct=True)
+                    # # 6. Cross-Temporal Ranks
+                    # # Multi-timeframe rank: average rank across different windows
+                    # short_window = max(2, window//2)  # Ensure minimum window of 2
+                    # short_rank = df[feature].rolling(window=short_window, min_periods=max(1, short_window//2)).rank(pct=True)
+                    # medium_rank = df[feature].rolling(window=window, min_periods=max(1, window//2)).rank(pct=True)
+                    # long_rank = df[feature].rolling(window=window*2, min_periods=window).rank(pct=True)
                     
-                    # Weighted average of ranks (shorter timeframes get higher weight)
-                    multi_timeframe_rank = (0.5 * short_rank + 0.3 * medium_rank + 0.2 * long_rank)
-                    df[f"{feature}_multi_tf_rank_{window}"] = multi_timeframe_rank
+                    # # # Weighted average of ranks (shorter timeframes get higher weight)
+                    # multi_timeframe_rank = (0.5 * short_rank + 0.3 * medium_rank + 0.2 * long_rank)
+                    # df[f"{feature}_multi_tf_rank_{window}"] = multi_timeframe_rank
                     
-                    # Rank divergence: difference between short and long-term ranks
-                    rank_divergence = short_rank - long_rank
-                    df[f"{feature}_rank_divergence_{window}"] = rank_divergence
+                    # # # Rank divergence: difference between short and long-term ranks
+                    # rank_divergence = short_rank - long_rank
+                    # df[f"{feature}_rank_divergence_{window}"] = rank_divergence
                     
-                                        # 7. Adaptive Ranks
-                    # Volatility-adjusted window rank: expand window during volatile periods
-                    base_vol = df[feature].rolling(window=window, min_periods=max(1, window//2)).std()
-                    vol_multiplier = (base_vol / base_vol.rolling(window=lookback_window, min_periods=window).median()).fillna(1)
-                    adaptive_window = np.clip(window * vol_multiplier, window, window*3).astype(int)
+                    #                     # 7. Adaptive Ranks
+                    # # Volatility-adjusted window rank: expand window during volatile periods
+                    # base_vol = df[feature].rolling(window=window, min_periods=max(1, window//2)).std()
+                    # vol_multiplier = (base_vol / base_vol.rolling(window=lookback_window, min_periods=window).median()).fillna(1)
+                    # adaptive_window = np.clip(window * vol_multiplier, window, window*3).astype(int)
                     
-                    # Dynamic rank calculation with adaptive window
-                    adaptive_ranks = []
-                    for i in range(len(df)):
-                        if i < window:
-                            adaptive_ranks.append(np.nan)
-                        else:
-                            win_size = min(adaptive_window.iloc[i], i+1)
-                            win_size = max(2, int(win_size))  # Ensure minimum window of 2
-                            subset = df[feature].iloc[max(0, i-win_size+1):i+1]
-                            if len(subset) >= 2:
-                                rank_val = subset.rank(pct=True).iloc[-1]
-                                adaptive_ranks.append(rank_val)
-                            else:
-                                adaptive_ranks.append(np.nan)
-                    df[f"{feature}_adaptive_rank_{window}"] = adaptive_ranks
+                    # # Dynamic rank calculation with adaptive window
+                    # adaptive_ranks = []
+                    # for i in range(len(df)):
+                    #     if i < window:
+                    #         adaptive_ranks.append(np.nan)
+                    #     else:
+                    #         win_size = min(adaptive_window.iloc[i], i+1)
+                    #         win_size = max(2, int(win_size))  # Ensure minimum window of 2
+                    #         subset = df[feature].iloc[max(0, i-win_size+1):i+1]
+                    #         if len(subset) >= 2:
+                    #             rank_val = subset.rank(pct=True).iloc[-1]
+                    #             adaptive_ranks.append(rank_val)
+                    #         else:
+                    #             adaptive_ranks.append(np.nan)
+                    # df[f"{feature}_adaptive_rank_{window}"] = adaptive_ranks
                     
                     # 8. Extremes and Outlier Ranks
                     # Extreme value rank: how extreme current value is
-                    z_scores = (df[feature] - rolling_mean) / (rolling_std + 1e-8)
-                    extreme_rank = np.abs(z_scores).rolling(window=lookback_window, min_periods=window).rank(pct=True)
-                    df[f"{feature}_extreme_rank_{window}"] = extreme_rank
+                    # rolling_mean = df[feature].rolling(window=window).mean()
+                    # rolling_std = df[feature].rolling(window=window).std()
+                    # rolling_rank = df[feature].rolling(window=window).rank(pct=True)
+                    # z_scores = (df[feature] - rolling_mean) / (rolling_std + 1e-8)
+                    # extreme_rank = np.abs(z_scores).rolling(window=lookback_window, min_periods=window).rank(pct=True)
+                    # df[f"{feature}_extreme_rank_{window}"] = extreme_rank
                     
-                    # Tail rank: position in distribution tails
-                    tail_indicator = np.where(rolling_rank > 0.9, 1,  # Upper tail
-                                            np.where(rolling_rank < 0.1, -1,  # Lower tail  
-                                                   0))  # Middle
-                    df[f"{feature}_tail_position_{window}"] = tail_indicator
+                    # # Tail rank: position in distribution tails
+                    # tail_indicator = np.where(rolling_rank > 0.9, 1,  # Upper tail
+                    #                         np.where(rolling_rank < 0.1, -1,  # Lower tail  
+                    #                                0))  # Middle
+                    # df[f"{feature}_tail_position_{window}"] = tail_indicator
                     
-                    # Clean up temporary columns
-                    df.drop(columns=[f"{feature}_momentum_streak_{window}"], inplace=True, errors='ignore')
+                    # # Clean up temporary columns
+                    # df.drop(columns=[f"{feature}_momentum_streak_{window}"], inplace=True, errors='ignore')
+        for spread_name, (eu_col, us_col) in self.spread_pairs.items():
+            df.drop(spread_name, axis=1, inplace=True, errors='ignore')
+        df.drop("VIX", axis=1, inplace=True, errors='ignore')
         
         return df
     
@@ -815,11 +822,11 @@ class AdvancedSpreadFeatureEngineering:
         all_base_features = list(spread_features.columns)
         
         # Add rank-based features
-        spread_features = self.add_rank_features(spread_features, all_base_features)
+        #spread_features = self.add_rank_features(spread_features, all_base_features)
         # Add fractal and chaos theory features
         #spread_features = self.add_fractal_features(spread_features, all_base_features)
         # Add statistical distribution features
-        #spread_features = self.add_distribution_features(spread_features, all_base_features)
+        spread_features = self.add_distribution_features(spread_features, all_base_features)
         # Add regime detection features
         #spread_features = self.add_regime_detection_features(spread_features, all_base_features)
         # Add cross-sectional features
@@ -878,7 +885,7 @@ def main():
     
     # Initialize advanced feature engineering class with 6 month windows
     feature_engineer = AdvancedSpreadFeatureEngineering(
-        windows=[3, 6]
+        windows=[12, 24]
     )
     
     # Run the complete pipeline
@@ -887,7 +894,7 @@ def main():
             macro_file_path="macro_data.csv",
             save_features=True,
             output_file="spread_features_advanced.csv",
-            correlation_threshold=0.7  # Threshold for correlation analysis
+            correlation_threshold=0.9  # Threshold for correlation analysis
         )
         
         print("\n=== Summary Statistics ===")

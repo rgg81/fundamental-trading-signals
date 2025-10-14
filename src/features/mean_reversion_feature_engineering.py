@@ -576,7 +576,7 @@ class MeanReversionFeatureEngineering:
         
         # Step 4: Remove highly correlated features
         print("4. Removing highly correlated features...")
-        selected_features = self.remove_correlated_features(valid_features, threshold=0.3)
+        selected_features = self.remove_correlated_features(valid_features, threshold=correlation_threshold)
         
         # Step 5: Final correlation analysis on selected features
         print("5. Analyzing final feature correlations...")
@@ -617,7 +617,7 @@ def main():
     
     # Initialize feature engineering class with different lookback periods
     feature_engineer = MeanReversionFeatureEngineering(
-        lookback_periods=[3, 6]  # 3, 6, 12, and 18 months
+        lookback_periods=[12, 24]  # 3, 6, 12, and 18 months
     )
     
     # Run the complete pipeline
@@ -626,7 +626,7 @@ def main():
             eurusd_file_path="EURUSD.csv",
             save_features=True,
             output_file="mean_reversion_features.csv",
-            correlation_threshold=0.5  # Threshold for final analysis
+            correlation_threshold=1.0  # Threshold for final analysis
         )
         
         print("\n=== Summary Statistics ===")

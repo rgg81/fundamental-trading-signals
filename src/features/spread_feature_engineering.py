@@ -163,11 +163,11 @@ class SpreadFeatureEngineering:
         for feature in features:
             if feature in df.columns:
                 for window in self.windows:
-                    df[f"{feature}_ma_{window}"] = df[feature].rolling(window=window).mean()
+                    mean = df[feature].ewm(span=window).mean()
                     
                     # Add moving average spread (current value - MA)
-                    df[f"{feature}_ma_spread_{window}"] = df[feature] - df[f"{feature}_ma_{window}"]
-        
+                    df[f"{feature}_ma_spread_{window}"] = mean
+
         return df
     
     def add_volatility_features(self, df: pd.DataFrame, features: List[str]) -> pd.DataFrame:
@@ -460,16 +460,16 @@ class SpreadFeatureEngineering:
         all_base_features = list(spread_features.columns)
         
         # Add lag features
-        spread_features = self.add_lag_features(spread_features, all_base_features, lags=3)
+        #spread_features = self.add_lag_features(spread_features, all_base_features, lags=3)
         
         # Add rate of change features
-        spread_features = self.add_rate_of_change_features(spread_features, all_base_features, periods=3)
+        #spread_features = self.add_rate_of_change_features(spread_features, all_base_features, periods=3)
         
         # Add moving average features
-        spread_features = self.add_moving_average_features(spread_features, all_base_features)
+        #spread_features = self.add_moving_average_features(spread_features, all_base_features)
         
         # Add volatility features
-        spread_features = self.add_volatility_features(spread_features, all_base_features)
+        #spread_features = self.add_volatility_features(spread_features, all_base_features)
         
         # Add momentum features
         spread_features = self.add_momentum_features(spread_features, all_base_features)
@@ -519,7 +519,7 @@ def main():
     
     # Initialize feature engineering class with 3 and 6 month windows
     feature_engineer = SpreadFeatureEngineering(
-        windows=[3, 6]
+        windows=[3, 12, 24]
     )
     
     # Run the complete pipeline
@@ -528,7 +528,7 @@ def main():
             macro_file_path="macro_data.csv",
             save_features=True,
             output_file="spread_features.csv",
-            correlation_threshold=0.5  # Threshold for correlation analysis
+            correlation_threshold=1.0  # Threshold for correlation analysis
         )
         
         print("\n=== Summary Statistics ===")

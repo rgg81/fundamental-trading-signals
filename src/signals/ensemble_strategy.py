@@ -28,17 +28,17 @@ class EnsembleOptunaStrategy(Strategy):
         self.feature_set = feature_set
 
         # Initialize all strategies
-     #   for i in range(1, 202):
-     #       self.strategies[f'LGBM_{i}'] = LGBMOptunaStrategy(feature_set="macro_")
-     #   for i in range(202, 404):
-     #       self.strategies[f'LGBM_{i}'] = LGBMOptunaStrategy(feature_set="tech_")
-     #   for i in range(404, 606):
-     #       self.strategies[f'LGBM_{i}'] = LGBMOptunaStrategy(feature_set="econ_")
-     #   for i in range(606, 808):
-     #       self.strategies[f'LGBM_{i}'] = LGBMOptunaStrategy(feature_set="mr_")
-     #   for i in range(808, 1010):
-     #       self.strategies[f'LGBM_{i}'] = LGBMOptunaStrategy(feature_set="spread_")
-        for i in range(1010, 1011):
+        for i in range(1, 50):
+            self.strategies[f'LGBM_{i}'] = LGBMOptunaStrategy(feature_set="macro_")
+        for i in range(50, 100):
+            self.strategies[f'LGBM_{i}'] = LGBMOptunaStrategy(feature_set="tech_")
+        # for i in range(100, 150):
+        #     self.strategies[f'LGBM_{i}'] = LGBMOptunaStrategy(feature_set="econ_")
+        for i in range(150, 200):
+            self.strategies[f'LGBM_{i}'] = LGBMOptunaStrategy(feature_set="mr_")
+        for i in range(200, 250):
+            self.strategies[f'LGBM_{i}'] = LGBMOptunaStrategy(feature_set="spread_")
+        for i in range(250, 300):
             self.strategies[f'LGBM_{i}'] = LGBMOptunaStrategy(feature_set="spreadadv_")
 
         print(f"Ensemble Strategy initialized with {len(self.strategies)} strategies")

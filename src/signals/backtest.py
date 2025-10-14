@@ -20,13 +20,13 @@ class Backtest:
         for i in range(len(data)):
             current_data = data.iloc[i]
             current_data_frame = data.iloc[i:1 + i]
-            past_data = data.iloc[:i]
+            past_data = data.iloc[:i + 1]
 
             if past_data.empty or i < 160 or current_data_frame.empty:  # Ensure we have enough past data for the strategy
                 # Skip the first row since there's no past data
                 continue
 
-            #if current_data_frame.iloc[0]['Date'].year != 2017:
+            #if current_data_frame.iloc[0]['Date'].year != 2020:
             #    continue
 
             signal, amount = self.strategy.generate_signal(past_data, current_data_frame)
@@ -51,7 +51,7 @@ class Backtest:
                 'Amount': amount,
                 'Return': profit_loss
             }
-            print(f"Date: {current_data['Date']}, Signal: {signal}, Amount: {amount}, Return: {profit_loss}")
+            print(f"*** Date: {current_data['Date']}, Label: {current_data['Label']} Signal: {signal}, Amount: {amount}, Return: {profit_loss}, current close: {current_data[self.close_col]} next close: {next_close if i + 1 < len(data) else 'N/A'} ***", flush=True)
             results.append(result)
 
         return pd.DataFrame(results)

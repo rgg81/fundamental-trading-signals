@@ -480,11 +480,11 @@ class TechnicalIndicatorsFeatureEngineering:
         
         # Combine all features
         all_features = pd.concat([
-            trend_features,
-            momentum_features, 
-            volatility_features,
+          # trend_features,
+          # momentum_features, 
+          # volatility_features,
             oscillator_features,
-            custom_features
+         #   custom_features
         ], axis=1)
         
         print(f"   Generated {all_features.shape[1]} technical indicators")
@@ -504,7 +504,7 @@ class TechnicalIndicatorsFeatureEngineering:
         
         # Step 4: Remove highly correlated features
         print("4. Removing highly correlated features...")
-        selected_features = self.remove_correlated_features(valid_features, threshold=0.7)
+        selected_features = self.remove_correlated_features(valid_features, threshold=correlation_threshold)
         
         # Step 5: Final correlation analysis on selected features
         print("5. Analyzing final feature correlations...")
@@ -545,7 +545,7 @@ def main():
     
     # Initialize feature engineering class with different lookback periods
     feature_engineer = TechnicalIndicatorsFeatureEngineering(
-        lookback_periods=[6, 12, 24]  # 6, 12, and 24 months
+        lookback_periods=[18]  # 3, 6, 12, and 24 months
     )
     
     # Run the complete pipeline
@@ -554,7 +554,7 @@ def main():
             eurusd_file_path="EURUSD.csv",
             save_features=True,
             output_file="technical_indicators_features.csv",
-            correlation_threshold=0.7  # Threshold for final analysis
+            correlation_threshold=1.0  # Threshold for final analysis
         )
         
         print("\n=== Summary Statistics ===")

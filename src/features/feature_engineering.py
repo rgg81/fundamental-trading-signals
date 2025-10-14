@@ -3,19 +3,19 @@ import pandas as pd
 # Configuration
 LAG_FEATURES = ["EU_CPI", "US_CPI", "US_Core_CPI", "EU_10Y_Yield", "US_10Y_Yield", "Fed_Funds_Rate", "ECB_Deposit_Rate",
                 "VIX"]
-RATE_OF_CHANGE_FEATURES = LAG_FEATURES
+RATE_OF_CHANGE_FEATURES = ["EU_CPI", "US_CPI"]
 MOVING_AVERAGE_FEATURES = LAG_FEATURES
 VOLATILITY_FEATURES = ["VIX", "US_10Y_Yield", "EU_10Y_Yield"]
 
 # Moving average windows
-MOVING_AVERAGE_WINDOWS = [3, 6, 12]
-VOLATILITY_WINDOWS = [3, 6, 12]
+MOVING_AVERAGE_WINDOWS = [1, 3]
+VOLATILITY_WINDOWS = [3]
 
 
 def add_lag_features(df, features, lags=3):
     """Generate lag features for the given columns."""
     for feature in features:
-        for lag in range(1, lags + 1):
+        for lag in range(0, lags + 1):
             df[f"{feature}_lag_{lag}"] = df[feature].shift(lag)
     return df
 
@@ -32,7 +32,7 @@ def add_moving_average_features(df, features, windows):
     """Generate moving average features."""
     for feature in features:
         for window in windows:
-            df[f"{feature}_ma_{window}"] = df[feature].rolling(window=window).mean()
+            df[f"{feature}_ma_{window}"] = df[feature].pct_change().rolling(window=window).mean()
     return df
 
 
@@ -40,16 +40,21 @@ def add_volatility_features(df, features, windows):
     """Generate rolling volatility features."""
     for feature in features:
         for window in windows:
-            df[f"{feature}_vol_{window}"] = df[feature].rolling(window=window).std()
+            df[f"{feature}_vol_{window}"] = df[feature].pct_change().rolling(window=window).std()
     return df
 
 
 def generate_features(df):
     """Pipeline to generate all features."""
-    df = add_lag_features(df, LAG_FEATURES)
-    df = add_rate_of_change_features(df, RATE_OF_CHANGE_FEATURES)
-    df = add_moving_average_features(df, MOVING_AVERAGE_FEATURES, MOVING_AVERAGE_WINDOWS)
-    df = add_volatility_features(df, VOLATILITY_FEATURES, VOLATILITY_WINDOWS)
+    #df = add_lag_features(df, RATE_OF_CHANGE_FEATURES, lags=1)
+    # df = add_rate_of_change_features(df, LAG_FEATURES, periods=1)
+    # df = add_rate_of_change_features(df, LAG_FEATURES, periods=2)
+    # df = add_rate_of_change_features(df, LAG_FEATURES, periods=3)
+    df = add_moving_average_features(df, LAG_FEATURES, MOVING_AVERAGE_WINDOWS)
+    #df = add_volatility_features(df, VOLATILITY_FEATURES, VOLATILITY_WINDOWS)
+    df.drop(LAG_FEATURES, axis=1, inplace=True)  # Drop original columns to avoid redundancy
+    #df.drop(MOVING_AVERAGE_FEATURES, axis=1, inplace=True)  # Drop original columns to avoid redundancy
+    #df.drop(VOLATILITY_FEATURES, axis=1, inplace=True)  # Drop original columns to avoid redundancy
 
     # Drop rows with NaNs introduced by feature generation
     # Analyze NaN values before removal
