@@ -145,7 +145,7 @@ if __name__ == "__main__":
     
     # Create and run backtest with random strategy
     #strategy = RandomStrategy()
-    strategy = LGBMOptunaStrategy(feature_set="macro_")
+    #strategy = LGBMOptunaStrategy(feature_set="macro_")
     #strategy = MLPOptunaStrategy() NO GO
     #strategy = LogisticRegressionOptunaStrategy() NO GO
     #strategy = GaussianNBOptunaStrategy() NO GO
@@ -161,7 +161,7 @@ if __name__ == "__main__":
     #strategy = NGBoostOptunaStrategy()
     #strategy = GaussianProcessOptunaStrategy()
     #strategy = PyTorchNeuralNetOptunaStrategy() NO GO
-    #strategy = EnsembleOptunaStrategy(feature_set=None)
+    strategy = EnsembleOptunaStrategy(feature_set=None)
     #strategy = EBMOptunaStrategy()
     # strategy = VotingEnsembleStrategy(
     #    voting_method='majority',

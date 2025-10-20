@@ -28,17 +28,17 @@ class EnsembleOptunaStrategy(Strategy):
         self.feature_set = feature_set
 
         # Initialize all strategies
-        for i in range(1, 50):
-            self.strategies[f'LGBM_{i}'] = LGBMOptunaStrategy(feature_set="macro_")
-        for i in range(50, 100):
+        #for i in range(1, 50):
+        #    self.strategies[f'LGBM_{i}'] = LGBMOptunaStrategy(feature_set="macro_")
+        for i in range(0, 10):
             self.strategies[f'LGBM_{i}'] = LGBMOptunaStrategy(feature_set="tech_")
-        # for i in range(100, 150):
-        #     self.strategies[f'LGBM_{i}'] = LGBMOptunaStrategy(feature_set="econ_")
-        for i in range(150, 200):
+        for i in range(10, 20):
+            self.strategies[f'LGBM_{i}'] = LGBMOptunaStrategy(feature_set="econ_")
+        for i in range(20, 30):
             self.strategies[f'LGBM_{i}'] = LGBMOptunaStrategy(feature_set="mr_")
-        for i in range(200, 250):
+        for i in range(30, 40):
             self.strategies[f'LGBM_{i}'] = LGBMOptunaStrategy(feature_set="spread_")
-        for i in range(250, 300):
+        for i in range(40, 50):
             self.strategies[f'LGBM_{i}'] = LGBMOptunaStrategy(feature_set="spreadadv_")
 
         print(f"Ensemble Strategy initialized with {len(self.strategies)} strategies")
@@ -60,11 +60,11 @@ class EnsembleOptunaStrategy(Strategy):
             
             if signal == 1:
                 # Add weight for buy signal
-                total_weight += amount
+                total_weight += self.max_amount
                 weighted_signal_sum += amount
             else:  # signal == 0
                 # Subtract weight for sell signal
-                total_weight += amount
+                total_weight += self.max_amount
                 weighted_signal_sum -= amount
             
             print(f"  {name}: Signal={signal}, Amount={amount}, Weight={'+'if signal==1 else '-'}{amount}")
