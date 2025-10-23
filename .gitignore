@@ -1,6 +1,7 @@
 *.csv
 *.txt
 .idea
+*.log
 
 # Python cache files
 __pycache__/

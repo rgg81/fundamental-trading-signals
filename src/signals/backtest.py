@@ -16,43 +16,47 @@ class Backtest:
         """
         results = []
         data = data.sort_values('Date')  # Ensure data is sorted by date
+        step_size = 6  # You can adjust the step size if needed
 
-        for i in range(len(data)):
-            current_data = data.iloc[i]
-            current_data_frame = data.iloc[i:1 + i]
-            past_data = data.iloc[:i + 1]
+        for i in range(0, len(data), step_size):
+            current_step = i + step_size
+            current_data_frame = data.iloc[i:current_step]
+            past_data = data.iloc[:current_step]
 
-            if past_data.empty or i < 160 or current_data_frame.empty:  # Ensure we have enough past data for the strategy
+            if past_data.empty or i < 154 or current_data_frame.empty:  # Ensure we have enough past data for the strategy
                 # Skip the first row since there's no past data
                 continue
 
             #if current_data_frame.iloc[0]['Date'].year != 2020:
             #    continue
 
-            signal, amount = self.strategy.generate_signal(past_data, current_data_frame)
-            if signal is None: continue
+            signals, amounts = self.strategy.generate_signal(past_data, current_data_frame)
+            if signals is None: continue
             profit_loss = 0
-
-            if signal == 1:  # Buy signal
-                if i + 1 < len(data):
-                    next_close = data.iloc[i + 1][self.close_col]
-                    # percentage change
-                    profit_loss = ((next_close - current_data[self.close_col]) / current_data[self.close_col]) 
-                    profit_loss = max(min(profit_loss, self.stop_loss), -self.stop_loss) * (amount / self.max_amount)
-            else:
-                if i + 1 < len(data):
-                    next_close = data.iloc[i + 1][self.close_col]
-                    # percentage change
-                    profit_loss = ((current_data[self.close_col] - next_close) / current_data[self.close_col]) 
-                    profit_loss = max(min(profit_loss, self.stop_loss), -self.stop_loss) * (amount / self.max_amount)
-            result = {
-                'Date': current_data['Date'],
-                'Signal': signal,
-                'Amount': amount,
-                'Return': profit_loss
-            }
-            print(f"*** Date: {current_data['Date']}, Label: {current_data['Label']} Signal: {signal}, Amount: {amount}, Return: {profit_loss}, current close: {current_data[self.close_col]} next close: {next_close if i + 1 < len(data) else 'N/A'} ***", flush=True)
-            results.append(result)
+            index_next = i + 1
+            for signal, amount in zip(signals, amounts):
+                current_data = data.iloc[index_next - 1]
+                if signal == 1:  # Buy signal
+                    if index_next < len(data):
+                        next_close = data.iloc[index_next][self.close_col]
+                        # percentage change
+                        profit_loss = ((next_close - current_data[self.close_col]) / current_data[self.close_col]) 
+                        profit_loss = max(min(profit_loss, self.stop_loss), -self.stop_loss) * (amount / self.max_amount)
+                else:
+                    if index_next < len(data):
+                        next_close = data.iloc[index_next][self.close_col]
+                        # percentage change
+                        profit_loss = ((current_data[self.close_col] - next_close) / current_data[self.close_col]) 
+                        profit_loss = max(min(profit_loss, self.stop_loss), -self.stop_loss) * (amount / self.max_amount)
+                result = {
+                    'Date': current_data['Date'],
+                    'Signal': signal,
+                    'Amount': amount,
+                    'Return': profit_loss
+                }
+                print(f"*** Date: {current_data['Date']}, Label: {current_data['Label']} Signal: {signal}, Amount: {amount}, Return: {profit_loss}, current close: {current_data[self.close_col]} next close: {next_close if index_next < len(data) else 'N/A'} ***", flush=True)
+                results.append(result)
+                index_next += 1
 
         return pd.DataFrame(results)
 

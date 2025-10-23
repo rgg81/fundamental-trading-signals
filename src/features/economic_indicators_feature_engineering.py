@@ -314,7 +314,7 @@ def main():
     
     # Initialize feature engineering class
     feature_engineer = EconomicIndicatorsFeatureEngineering(
-        time_window=3              # 3-month rolling window
+        time_window=2              # 6-month rolling window
     )
     
     # Run the complete pipeline

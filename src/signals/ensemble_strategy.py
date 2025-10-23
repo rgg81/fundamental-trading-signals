@@ -30,15 +30,15 @@ class EnsembleOptunaStrategy(Strategy):
         # Initialize all strategies
         #for i in range(1, 50):
         #    self.strategies[f'LGBM_{i}'] = LGBMOptunaStrategy(feature_set="macro_")
+        # for i in range(10, 20):
+        #     self.strategies[f'LGBM_{i}'] = LGBMOptunaStrategy(feature_set="econ_")        
         for i in range(0, 10):
             self.strategies[f'LGBM_{i}'] = LGBMOptunaStrategy(feature_set="tech_")
         for i in range(10, 20):
-            self.strategies[f'LGBM_{i}'] = LGBMOptunaStrategy(feature_set="econ_")
-        for i in range(20, 30):
             self.strategies[f'LGBM_{i}'] = LGBMOptunaStrategy(feature_set="mr_")
-        for i in range(30, 40):
+        for i in range(20, 30):
             self.strategies[f'LGBM_{i}'] = LGBMOptunaStrategy(feature_set="spread_")
-        for i in range(40, 50):
+        for i in range(30, 40):
             self.strategies[f'LGBM_{i}'] = LGBMOptunaStrategy(feature_set="spreadadv_")
 
         print(f"Ensemble Strategy initialized with {len(self.strategies)} strategies")
@@ -49,55 +49,63 @@ class EnsembleOptunaStrategy(Strategy):
             print("No valid predictions from strategies, returning default")
             return 0, self.max_amount
         
-        total_weight = 0
-        weighted_signal_sum = 0
+        
         
         print(f"\nAggregating {len(predictions)} strategy predictions:")
+
+        total_signals = len(list(predictions.items())[0][1]['signals'])
+        ensemble_signals = []
+        ensemble_amounts = []
+        for i in range(total_signals):
+            total_weight = 0
+            weighted_signal_sum = 0
         
-        for name, pred in predictions.items():
-            signal = pred['signal']
-            amount = pred['amount']
+            for name, pred in predictions.items():
+                signal = pred['signals'][i]
+                amount = pred['amounts'][i]
+                
+                if signal == 1:
+                    # Add weight for buy signal
+                    total_weight += self.max_amount
+                    weighted_signal_sum += amount
+                else:  # signal == 0
+                    # Subtract weight for sell signal
+                    total_weight += self.max_amount
+                    weighted_signal_sum -= amount
+                
+                print(f"  {name}: Signal={signal}, Amount={amount}, Weight={'+'if signal==1 else '-'}{amount}")
             
-            if signal == 1:
-                # Add weight for buy signal
-                total_weight += self.max_amount
-                weighted_signal_sum += amount
-            else:  # signal == 0
-                # Subtract weight for sell signal
-                total_weight += self.max_amount
-                weighted_signal_sum -= amount
-            
-            print(f"  {name}: Signal={signal}, Amount={amount}, Weight={'+'if signal==1 else '-'}{amount}")
-        
-        # Calculate ensemble signal and amount
-        if total_weight == 0:
-            ensemble_signal = 0
-            ensemble_amount = self.max_amount
-        else:
-            # Normalize the weighted signal to [-1, 1] range
-            normalized_signal = weighted_signal_sum / total_weight
-            
-            # Convert to final signal and amount
-            if normalized_signal > 0:
-                ensemble_signal = 1
-                # Scale amount proportionally to confidence (0 to max_amount)
-                ensemble_amount = min(self.max_amount, abs(normalized_signal) * self.max_amount)
-            else:
+            # Calculate ensemble signal and amount
+            if total_weight == 0:
                 ensemble_signal = 0
-                # Scale amount proportionally to confidence (0 to max_amount)
-                ensemble_amount = min(self.max_amount, abs(normalized_signal) * self.max_amount)
+                ensemble_amount = self.max_amount
+            else:
+                # Normalize the weighted signal to [-1, 1] range
+                normalized_signal = weighted_signal_sum / total_weight
+                
+                # Convert to final signal and amount
+                if normalized_signal > 0:
+                    ensemble_signal = 1
+                    # Scale amount proportionally to confidence (0 to max_amount)
+                    ensemble_amount = min(self.max_amount, abs(normalized_signal) * self.max_amount)
+                else:
+                    ensemble_signal = 0
+                    # Scale amount proportionally to confidence (0 to max_amount)
+                    ensemble_amount = min(self.max_amount, abs(normalized_signal) * self.max_amount)
+                
+                # Ensure minimum amount of 1 and maximum of max_amount
+                ensemble_amount = max(1, min(self.max_amount, int(ensemble_amount)))
             
-            # Ensure minimum amount of 1 and maximum of max_amount
-            ensemble_amount = max(1, min(self.max_amount, int(ensemble_amount)))
+            print(f"\nEnsemble Result:")
+            print(f"  Weighted Sum: {weighted_signal_sum}")
+            print(f"  Total Weight: {total_weight}")
+            print(f"  Normalized Signal: {weighted_signal_sum/total_weight if total_weight > 0 else 0:.3f}")
+            print(f"  Final Signal: {ensemble_signal}")
+            print(f"  Final Amount: {ensemble_amount}")
+            ensemble_signals.append(ensemble_signal)
+            ensemble_amounts.append(ensemble_amount)
         
-        print(f"\nEnsemble Result:")
-        print(f"  Weighted Sum: {weighted_signal_sum}")
-        print(f"  Total Weight: {total_weight}")
-        print(f"  Normalized Signal: {weighted_signal_sum/total_weight if total_weight > 0 else 0:.3f}")
-        print(f"  Final Signal: {ensemble_signal}")
-        print(f"  Final Amount: {ensemble_amount}")
-        
-        return ensemble_signal, ensemble_amount
+        return ensemble_signals, ensemble_amounts 
 
     def generate_signal(self, past_data, current_data):
         """Generate ensemble signal from all strategies"""
@@ -118,15 +126,15 @@ class EnsembleOptunaStrategy(Strategy):
         for name, strategy in self.strategies.items():
             try:
                 # Each strategy will call its own fit method in generate_signal
-                signal, amount = strategy.generate_signal(past_data[feature_columns], current_data[feature_columns])
-                strategy_predictions[name] = {'signal': signal, 'amount': amount}
-                print(f"{name}: Signal={signal}, Amount={amount}")
-                
+                signals, amounts = strategy.generate_signal(past_data[feature_columns], current_data[feature_columns])
+                strategy_predictions[name] = {'signals': signals, 'amounts': amounts}
+                print(f"{name}: Signals={signals}, Amounts={amounts}")
+
             except Exception as e:
                 print(f"Failed to get prediction from {name}: {e}")
                 continue
         
         # Aggregate all predictions
-        ensemble_signal, ensemble_amount = self._aggregate_predictions(strategy_predictions)
-        
-        return int(ensemble_signal), int(ensemble_amount)
+        ensemble_signals, ensemble_amounts = self._aggregate_predictions(strategy_predictions)
+
+        return ensemble_signals, ensemble_amounts
