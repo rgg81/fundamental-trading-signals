@@ -617,7 +617,7 @@ def main():
     
     # Initialize feature engineering class with different lookback periods
     feature_engineer = MeanReversionFeatureEngineering(
-        lookback_periods=[12, 24]  # 3, 6, 12, and 18 months
+        lookback_periods=[6, 12, 24]  # 6, 12, and 24 months
     )
     
     # Run the complete pipeline

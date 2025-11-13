@@ -8,8 +8,8 @@ MOVING_AVERAGE_FEATURES = LAG_FEATURES
 VOLATILITY_FEATURES = ["VIX", "US_10Y_Yield", "EU_10Y_Yield"]
 
 # Moving average windows
-MOVING_AVERAGE_WINDOWS = [1, 3]
-VOLATILITY_WINDOWS = [3]
+MOVING_AVERAGE_WINDOWS = [3, 6, 12]
+VOLATILITY_WINDOWS = [3, 6, 12]
 
 
 def add_lag_features(df, features, lags=3):
@@ -46,13 +46,11 @@ def add_volatility_features(df, features, windows):
 
 def generate_features(df):
     """Pipeline to generate all features."""
-    #df = add_lag_features(df, RATE_OF_CHANGE_FEATURES, lags=1)
-    # df = add_rate_of_change_features(df, LAG_FEATURES, periods=1)
-    # df = add_rate_of_change_features(df, LAG_FEATURES, periods=2)
-    # df = add_rate_of_change_features(df, LAG_FEATURES, periods=3)
+    df = add_lag_features(df, RATE_OF_CHANGE_FEATURES, lags=3)
+    df = add_rate_of_change_features(df, LAG_FEATURES, periods=3)
     df = add_moving_average_features(df, LAG_FEATURES, MOVING_AVERAGE_WINDOWS)
-    #df = add_volatility_features(df, VOLATILITY_FEATURES, VOLATILITY_WINDOWS)
-    df.drop(LAG_FEATURES, axis=1, inplace=True)  # Drop original columns to avoid redundancy
+    df = add_volatility_features(df, VOLATILITY_FEATURES, VOLATILITY_WINDOWS)
+    #df.drop(LAG_FEATURES, axis=1, inplace=True)  # Drop original columns to avoid redundancy
     #df.drop(MOVING_AVERAGE_FEATURES, axis=1, inplace=True)  # Drop original columns to avoid redundancy
     #df.drop(VOLATILITY_FEATURES, axis=1, inplace=True)  # Drop original columns to avoid redundancy
 

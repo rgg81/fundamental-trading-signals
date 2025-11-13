@@ -84,14 +84,6 @@ if __name__ == "__main__":
     # rename all the features columns to have prefix macro_ except ['Label', 'Date', 'EURUSD_Close']
     data.rename(columns=lambda x: f"macro_{x}" if x != "Date" and x != "Label" and x != "EURUSD_Close" else x, inplace=True)
 
-    # read economic indicators features
-    features_economic = pd.read_csv("economic_indicators_features.csv", parse_dates=["Date"])
-    features_economic.set_index("Date", inplace=True)
-    # rename all the features columns to have prefix econ_ except ['Label', 'Date', 'EURUSD_Close']
-    features_economic.rename(columns=lambda x: f"econ_{x}" if x != "Date" and x != "Label" and x != "EURUSD_Close"
-                                else x, inplace=True)
-    # outer join economic indicators features with data by Date
-    data = data.join(features_economic, how="inner")
 
     # read technical indicators features
     features_technical = pd.read_csv("technical_indicators_features.csv", parse_dates=["Date"])
@@ -111,23 +103,15 @@ if __name__ == "__main__":
     # outer join mean_reversion features with data by Date
     data = data.join(features_mean_reversion, how="inner")
 
-    # read spread features
-    features_spread = pd.read_csv("spread_features.csv", parse_dates=["Date"])
-    features_spread.set_index("Date", inplace=True)
-    # rename all the features columns to have prefix spread_ except ['Label', 'Date', 'EURUSD_Close']
-    features_spread.rename(columns=lambda x: f"spread_{x}" if x != "Date" and x != "Label" and x != "EURUSD_Close"
-                                else x, inplace=True)
-    # outer join spread features with data by Date
-    data = data.join(features_spread, how="inner")
-
     # read spread advanced features
-    features_spread_advanced = pd.read_csv("spread_features_advanced.csv", parse_dates=["Date"])
+    features_spread_advanced = pd.read_csv("spread_features_advanced_distribution.csv", parse_dates=["Date"])
     features_spread_advanced.set_index("Date", inplace=True)
     # rename all the features columns to have prefix spread_ except ['Label', 'Date', 'EURUSD_Close']
-    features_spread_advanced.rename(columns=lambda x: f"spreadadv_{x}" if x != "Date" and x != "Label" and x != "EURUSD_Close"
+    features_spread_advanced.rename(columns=lambda x: f"spreadadvdistribution_{x}" if x != "Date" and x != "Label" and x != "EURUSD_Close"
                                 else x, inplace=True)
     # outer join spread advanced features with data by Date
     data = data.join(features_spread_advanced, how="inner")
+
 
     # read regime detection features
     features_regime = pd.read_csv("regime_detection_features.csv", parse_dates=["Date"])
@@ -145,7 +129,7 @@ if __name__ == "__main__":
     
     # Create and run backtest with random strategy
     #strategy = RandomStrategy()
-    #strategy = LGBMOptunaStrategy(feature_set="macro_")
+    #strategy = LGBMOptunaStrategy(feature_set="macro_", n_trials=30)
     #strategy = MLPOptunaStrategy() NO GO
     #strategy = LogisticRegressionOptunaStrategy() NO GO
     #strategy = GaussianNBOptunaStrategy() NO GO

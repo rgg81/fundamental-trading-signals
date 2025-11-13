@@ -135,40 +135,34 @@ class AdvancedSpreadFeatureEngineering:
                 for window in self.windows:
                     lookback_window = window * 4  # Extended lookback for better rank context
                     
-                    # 1. Basic Percentile Rank (foundational)
-                    #rolling_rank = df[feature].rolling(window=window).rank(pct=True)
-                    #df[f"{feature}_pct_rank_{window}"] = rolling_rank
+                    # 1. Basic Percentile Rank (foundational) - position in recent distribution
+                    df[f"{feature}_pct_rank_{window}"] = df[feature].rolling(window=window, min_periods=max(1, window//2)).rank(pct=True)
                     
-                    ## 2. Trend-Based Ranks
-                    ## Velocity rank: rank of rate of change
+                    # 2. Trend-Based Ranks
+                    # Velocity rank: rank of rate of change
                     velocity = df[feature].pct_change(periods=window//2)
                     df[f"{feature}_velocity_rank_{window}"] = velocity.rolling(window=lookback_window, min_periods=window).rank(pct=True)
                     
-                    ## Acceleration rank: rank of change in velocity  
+                    # Acceleration rank: rank of change in velocity  
                     acceleration = velocity.diff(periods=window//3)
                     df[f"{feature}_accel_rank_{window}"] = acceleration.rolling(window=lookback_window, min_periods=window).rank(pct=True)
                     
-                    ## Trend strength rank: rank based on how consistently trending
-                    trend_consistency = df[feature].rolling(window=window).apply(
-                       lambda x: len([i for i in range(1, len(x)) if (x.iloc[i] - x.iloc[i-1]) * (x.iloc[-1] - x.iloc[0]) > 0]) / max(1, len(x)-1)
+                    # Trend strength rank: rank based on how consistently trending
+                    trend_consistency = df[feature].rolling(window=window, min_periods=max(1, window//2)).apply(
+                       lambda x: len([i for i in range(1, len(x)) if (x.iloc[i] - x.iloc[i-1]) * (x.iloc[-1] - x.iloc[0]) > 0]) / max(1, len(x)-1) if len(x) > 1 else 0
                     )
                     df[f"{feature}_trend_strength_rank_{window}"] = trend_consistency.rolling(window=lookback_window, min_periods=window).rank(pct=True)
                     
                     # 3. Mean Reversion Ranks
-                    # Deviation from mean rank: how far from historical average
-                    #rolling_mean_long = df[feature].rolling(window=3*window).mean()
-                    #rolling_mean = df[feature].rolling(window=window).mean()
-                    #mean_deviation = (rolling_mean / rolling_mean_long)
-                    #df[f"{feature}_mean_dev_rank_{window}"] = mean_deviation
+                    # Deviation from mean rank: how far from historical average (z-score based)
+                    rolling_mean = df[feature].rolling(window=window, min_periods=max(1, window//2)).mean()
+                    rolling_std = df[feature].rolling(window=window, min_periods=max(1, window//2)).std()
+                    mean_deviation = np.abs((df[feature] - rolling_mean) / (rolling_std + 1e-8))
+                    df[f"{feature}_mean_dev_rank_{window}"] = mean_deviation.rolling(window=lookback_window, min_periods=window).rank(pct=True)
                     
-                    # Reversion probability rank: likelihood of mean reversion
-                    #distance_from_mean = np.abs(df[feature] - rolling_mean)
-                    #df[f"{feature}_reversion_prob_rank_{window}"] = distance_from_mean.rolling(window=window, min_periods=window).rank(pct=True)
-
-                    # Volatility-adjusted rank: current position relative to volatility-adjusted historical range
-                    #rolling_std = df[feature].rolling(window=lookback_window, min_periods=window).std()
-                    #vol_adj_position = (df[feature] - rolling_mean) / (rolling_std + 1e-8)
-                    #df[f"{feature}_vol_adj_rank_{window}"] = vol_adj_position.rolling(window=lookback_window, min_periods=window).rank(pct=True)
+                    # Volatility-adjusted position rank
+                    vol_adj_position = (df[feature] - rolling_mean) / (rolling_std + 1e-8)
+                    df[f"{feature}_vol_adj_rank_{window}"] = vol_adj_position.rolling(window=lookback_window, min_periods=window).rank(pct=True)
                     
                     # 4. Momentum Persistence Ranks
                     # Momentum streak rank: rank based on consecutive directional moves
@@ -192,74 +186,24 @@ class AdvancedSpreadFeatureEngineering:
                         last_direction = direction
                     
                     df[f"{feature}_momentum_streak_{window}"] = pd.Series(momentum_streaks, index=df.index)
-                    df[f"{feature}_momentum_rank_{window}"] = df[f"{feature}_momentum_streak_{window}"].rolling(window=window).rank(pct=True)
+                    df[f"{feature}_momentum_rank_{window}"] = df[f"{feature}_momentum_streak_{window}"].rolling(window=window, min_periods=max(1, window//2)).rank(pct=True)
                     
-                    # # 5. Regime-Based Ranks
-                    # # High/Low regime rank: position within recent high/low range
-                    #rolling_high = df[feature].rolling(window=lookback_window, min_periods=window).max()
-                    #rolling_low = df[feature].rolling(window=lookback_window, min_periods=window).min()
-                    #regime_position = (df[feature] - rolling_low) / (rolling_high - rolling_low + 1e-8)
-                    #df[f"{feature}_regime_rank_{window}"] = regime_position
+                    # 5. Regime-Based Ranks
+                    # High/Low regime position: position within recent range
+                    rolling_high = df[feature].rolling(window=lookback_window, min_periods=window).max()
+                    rolling_low = df[feature].rolling(window=lookback_window, min_periods=window).min()
+                    regime_position = (df[feature] - rolling_low) / (rolling_high - rolling_low + 1e-8)
+                    df[f"{feature}_regime_position_{window}"] = regime_position
                     
-                    # # Volatility regime rank: current volatility vs historical volatility distribution
-                    #vol_window = max(2, window//2)  # Ensure minimum window of 2
-                    #current_vol = df[feature].rolling(window=vol_window, min_periods=2).std()
-                    #df[f"{feature}_vol_regime_rank_{window}"] = current_vol.rolling(window=lookback_window, min_periods=window).rank(pct=True)
+                    # Volatility regime rank: current volatility vs historical volatility distribution
+                    vol_window = max(2, window//2)
+                    current_vol = df[feature].rolling(window=vol_window, min_periods=2).std()
+                    df[f"{feature}_vol_regime_rank_{window}"] = current_vol.rolling(window=lookback_window, min_periods=window).rank(pct=True)
                     
-                    # # 6. Cross-Temporal Ranks
-                    # # Multi-timeframe rank: average rank across different windows
-                    # short_window = max(2, window//2)  # Ensure minimum window of 2
-                    # short_rank = df[feature].rolling(window=short_window, min_periods=max(1, short_window//2)).rank(pct=True)
-                    # medium_rank = df[feature].rolling(window=window, min_periods=max(1, window//2)).rank(pct=True)
-                    # long_rank = df[feature].rolling(window=window*2, min_periods=window).rank(pct=True)
-                    
-                    # # # Weighted average of ranks (shorter timeframes get higher weight)
-                    # multi_timeframe_rank = (0.5 * short_rank + 0.3 * medium_rank + 0.2 * long_rank)
-                    # df[f"{feature}_multi_tf_rank_{window}"] = multi_timeframe_rank
-                    
-                    # # # Rank divergence: difference between short and long-term ranks
-                    # rank_divergence = short_rank - long_rank
-                    # df[f"{feature}_rank_divergence_{window}"] = rank_divergence
-                    
-                    #                     # 7. Adaptive Ranks
-                    # # Volatility-adjusted window rank: expand window during volatile periods
-                    # base_vol = df[feature].rolling(window=window, min_periods=max(1, window//2)).std()
-                    # vol_multiplier = (base_vol / base_vol.rolling(window=lookback_window, min_periods=window).median()).fillna(1)
-                    # adaptive_window = np.clip(window * vol_multiplier, window, window*3).astype(int)
-                    
-                    # # Dynamic rank calculation with adaptive window
-                    # adaptive_ranks = []
-                    # for i in range(len(df)):
-                    #     if i < window:
-                    #         adaptive_ranks.append(np.nan)
-                    #     else:
-                    #         win_size = min(adaptive_window.iloc[i], i+1)
-                    #         win_size = max(2, int(win_size))  # Ensure minimum window of 2
-                    #         subset = df[feature].iloc[max(0, i-win_size+1):i+1]
-                    #         if len(subset) >= 2:
-                    #             rank_val = subset.rank(pct=True).iloc[-1]
-                    #             adaptive_ranks.append(rank_val)
-                    #         else:
-                    #             adaptive_ranks.append(np.nan)
-                    # df[f"{feature}_adaptive_rank_{window}"] = adaptive_ranks
-                    
-                    # 8. Extremes and Outlier Ranks
-                    # Extreme value rank: how extreme current value is
-                    # rolling_mean = df[feature].rolling(window=window).mean()
-                    # rolling_std = df[feature].rolling(window=window).std()
-                    # rolling_rank = df[feature].rolling(window=window).rank(pct=True)
-                    # z_scores = (df[feature] - rolling_mean) / (rolling_std + 1e-8)
-                    # extreme_rank = np.abs(z_scores).rolling(window=lookback_window, min_periods=window).rank(pct=True)
-                    # df[f"{feature}_extreme_rank_{window}"] = extreme_rank
-                    
-                    # # Tail rank: position in distribution tails
-                    # tail_indicator = np.where(rolling_rank > 0.9, 1,  # Upper tail
-                    #                         np.where(rolling_rank < 0.1, -1,  # Lower tail  
-                    #                                0))  # Middle
-                    # df[f"{feature}_tail_position_{window}"] = tail_indicator
-                    
-                    # # Clean up temporary columns
-                    # df.drop(columns=[f"{feature}_momentum_streak_{window}"], inplace=True, errors='ignore')
+                    # Clean up temporary columns
+                    df.drop(columns=[f"{feature}_momentum_streak_{window}"], inplace=True, errors='ignore')
+        
+        # Drop base spread features (they're kept in other feature groups)
         for spread_name, (eu_col, us_col) in self.spread_pairs.items():
             df.drop(spread_name, axis=1, inplace=True, errors='ignore')
         df.drop("VIX", axis=1, inplace=True, errors='ignore')
@@ -458,33 +402,47 @@ class AdvancedSpreadFeatureEngineering:
         for feature in features:
             if feature in df.columns:
                 for window in self.windows:
-                    # CUSUM (Cumulative Sum) for change point detection
-                    mean_val = df[feature].rolling(window=window*2).mean()
-                    cusum = (df[feature] - mean_val).cumsum()
+                    # CUSUM (Cumulative Sum) for change point detection - using expanding mean for causality
+                    expanding_mean = df[feature].expanding(min_periods=window).mean()
+                    cusum = (df[feature] - expanding_mean).cumsum()
                     df[f"{feature}_cusum_{window}"] = cusum
                     
                     # Change point indicator (significant CUSUM deviation)
-                    cusum_std = cusum.rolling(window=window).std()
+                    cusum_std = cusum.rolling(window=window, min_periods=max(1, window//2)).std()
                     df[f"{feature}_changepoint_{window}"] = (np.abs(cusum) > 2 * cusum_std).astype(int)
                     
-                    # Level shift detection (mean comparison)
-                    past_mean = df[feature].shift(window).rolling(window=window).mean()
-                    current_mean = df[feature].rolling(window=window).mean()
-                    df[f"{feature}_levelshift_{window}"] = current_mean - past_mean
+                    # Level shift detection (mean comparison) - compare past to more recent past
+                    past_mean = df[feature].shift(window).rolling(window=window, min_periods=max(1, window//2)).mean()
+                    recent_mean = df[feature].shift(1).rolling(window=window, min_periods=max(1, window//2)).mean()
+                    df[f"{feature}_levelshift_{window}"] = recent_mean - past_mean
                     
-                    # Breakout intensity (distance from recent range)
-                    rolling_max = df[feature].rolling(window=window).max()
-                    rolling_min = df[feature].rolling(window=window).min()
+                    # Breakout intensity (distance from recent range) - shift max/min by 1 to avoid lookahead
+                    rolling_max = df[feature].shift(1).rolling(window=window, min_periods=max(1, window//2)).max()
+                    rolling_min = df[feature].shift(1).rolling(window=window, min_periods=max(1, window//2)).min()
                     rolling_range = rolling_max - rolling_min
                     breakout_up = (df[feature] - rolling_max) / (rolling_range + 1e-8)
                     breakout_down = (rolling_min - df[feature]) / (rolling_range + 1e-8)
                     df[f"{feature}_breakout_{window}"] = np.maximum(breakout_up, breakout_down)
                     
                     # Regime persistence (how long in current regime)
-                    trend_signal = (df[feature] > df[feature].rolling(window=window).mean()).astype(int)
+                    rolling_mean = df[feature].shift(1).rolling(window=window, min_periods=max(1, window//2)).mean()
+                    trend_signal = (df[feature] > rolling_mean).astype(int)
                     regime_changes = trend_signal.diff() != 0
-                    regime_duration = regime_changes.cumsum()
-                    df[f"{feature}_persistence_{window}"] = regime_duration
+                    
+                    # Count persistence using cumulative sum with reset on change
+                    persistence = []
+                    count = 0
+                    for change in regime_changes:
+                        if pd.isna(change):
+                            persistence.append(np.nan)
+                        elif change:
+                            count = 1
+                            persistence.append(count)
+                        else:
+                            count += 1
+                            persistence.append(count)
+                    
+                    df[f"{feature}_persistence_{window}"] = persistence
         
         return df
     
@@ -783,7 +741,8 @@ class AdvancedSpreadFeatureEngineering:
                                macro_file_path: str = "macro_data.csv",
                                save_features: bool = True,
                                output_file: str = "spread_features_advanced.csv",
-                               correlation_threshold: float = 0.7) -> pd.DataFrame:
+                               correlation_threshold: float = 0.7,
+                               generate_separate_files: bool = True) -> pd.DataFrame:
         """
         Run the complete advanced spread feature engineering pipeline.
         
@@ -797,6 +756,8 @@ class AdvancedSpreadFeatureEngineering:
             Output CSV filename
         correlation_threshold : float
             Threshold for correlation analysis
+        generate_separate_files : bool
+            Whether to generate separate CSV files for each feature group
             
         Returns:
         --------
@@ -815,24 +776,28 @@ class AdvancedSpreadFeatureEngineering:
         # Step 2: Generate basic spread features (SAME AS ORIGINAL)
         print("2. Generating spread features...")
         spread_features = self.generate_spread_features(macro_data)
+        base_features = spread_features.copy()  # Keep copy for individual group processing
         print(f"   Generated {len(spread_features.columns)} basic spread features")
         
-        # Step 3: Generate all ADVANCED feature types
-        print("3. Generating advanced features...")
+        # Step 3: Generate all ADVANCED feature types separately
+        print("3. Generating advanced features by group...")
         all_base_features = list(spread_features.columns)
         
-        # Add rank-based features
-        #spread_features = self.add_rank_features(spread_features, all_base_features)
-        # Add fractal and chaos theory features
-        #spread_features = self.add_fractal_features(spread_features, all_base_features)
+        feature_groups = {}
+        
+        
         # Add statistical distribution features
-        spread_features = self.add_distribution_features(spread_features, all_base_features)
-        # Add regime detection features
-        #spread_features = self.add_regime_detection_features(spread_features, all_base_features)
-        # Add cross-sectional features
-        #spread_features = self.add_cross_sectional_features(spread_features, all_base_features)
-        # Add time series decomposition features
-        #spread_features = self.add_decomposition_features(spread_features, all_base_features)
+        print("   3c. Generating distribution features...")
+        distribution_features = self.add_distribution_features(base_features.copy(), all_base_features)
+        feature_groups['distribution'] = distribution_features
+        print(f"      Generated {distribution_features.shape[1]} distribution features")
+        
+        
+        # Combine all features
+        all_features_list = [base_features] + list(feature_groups.values())
+        spread_features = pd.concat(all_features_list, axis=1)
+        # Remove duplicate columns (base features appear in each group)
+        spread_features = spread_features.loc[:, ~spread_features.columns.duplicated()]
 
         print(f"   Generated {spread_features.shape[1]} total advanced features")
         print(f"   Features available for {len(spread_features)} time periods")
@@ -842,7 +807,7 @@ class AdvancedSpreadFeatureEngineering:
         # Remove infinite values
         spread_features = spread_features.replace([np.inf, -np.inf], np.nan)
         
-        # Remove features with too many NaN values (>60% to be more lenient for recent data)
+        # Remove features with too many NaN values (>90% to be more lenient for recent data)
         nan_threshold = len(spread_features) * 0.1  # Keep features with at least 90% valid data
         valid_features = spread_features.dropna(thresh=nan_threshold, axis=1)
 
@@ -865,13 +830,45 @@ class AdvancedSpreadFeatureEngineering:
         
         # Step 7: Save features
         if save_features:
-            print(f"7. Saving features to {output_file}...")
+            print(f"7. Saving features...")
+            
+            if generate_separate_files:
+                print("   Generating separate files for each feature group...")
+                
+                # Save each feature group separately with cleaned features only
+                for group_name, group_features in feature_groups.items():
+                    # Clean group features
+                    group_features_clean = group_features.replace([np.inf, -np.inf], np.nan)
+                    group_features_clean = group_features_clean.dropna(thresh=nan_threshold, axis=1)
+                    
+                    # Only keep columns that are in the final valid_features (survived correlation removal)
+                    group_cols_to_keep = [col for col in group_features_clean.columns if col in valid_features.columns]
+                    
+                    if len(group_cols_to_keep) > 0:
+                        group_features_final = group_features_clean[group_cols_to_keep]
+                        
+                        group_output_file = output_file.replace('.csv', f'_{group_name}.csv')
+                        group_features_final.to_csv(group_output_file)
+                        print(f"      {group_name}: {len(group_features_final.columns)} features -> {group_output_file}")
+                    else:
+                        print(f"      {group_name}: No features survived cleaning")
+                
+                # Also save base features
+                base_cols_to_keep = [col for col in base_features.columns if col in valid_features.columns]
+                if len(base_cols_to_keep) > 0:
+                    base_features_final = base_features[base_cols_to_keep]
+                    base_output_file = output_file.replace('.csv', '_base.csv')
+                    base_features_final.to_csv(base_output_file)
+                    print(f"      base: {len(base_features_final.columns)} features -> {base_output_file}")
+            
+            # Save combined features
+            print(f"   Saving combined features to {output_file}...")
             valid_features.to_csv(output_file)
             
             # Save correlation matrix
             corr_file = output_file.replace('.csv', '_correlations.csv')
             final_correlation_matrix.to_csv(corr_file)
-            print(f"   Features saved to {output_file}")
+            print(f"   Combined features saved to {output_file}")
             print(f"   Correlations saved to {corr_file}")
         
         print("\n=== Advanced Feature Engineering Complete ===")
@@ -883,18 +880,19 @@ class AdvancedSpreadFeatureEngineering:
 def main():
     """Main function to run the advanced spread feature engineering pipeline."""
     
-    # Initialize advanced feature engineering class with 6 month windows
+    # Initialize advanced feature engineering class with 12 and 24 month windows
     feature_engineer = AdvancedSpreadFeatureEngineering(
         windows=[12, 24]
     )
     
-    # Run the complete pipeline
+    # Run the complete pipeline with separate CSV generation
     try:
         features = feature_engineer.run_feature_engineering(
             macro_file_path="macro_data.csv",
             save_features=True,
             output_file="spread_features_advanced.csv",
-            correlation_threshold=0.9  # Threshold for correlation analysis
+            correlation_threshold=0.9,  # Threshold for correlation analysis
+            generate_separate_files=True  # Generate separate CSVs for each feature group
         )
         
         print("\n=== Summary Statistics ===")

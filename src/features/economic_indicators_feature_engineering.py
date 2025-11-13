@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 import quantstats as qs
-from typing import Dict, Optional
+from typing import Dict, Optional, List
 import warnings
 
 warnings.filterwarnings('ignore')
@@ -9,19 +9,21 @@ warnings.filterwarnings('ignore')
 class EconomicIndicatorsFeatureEngineering:
     """
     Feature engineering class that creates economic indicators based on binary predictions
-    (        print("=== Starting Economic Indicators Feature Engineering Pipeline (Binary Prediction) ===\n")for buy, -1 for sell) using a rolling time window approach.
+    (+1 for buy, -1 for sell) using a rolling time window approach.
     """
     
-    def __init__(self, time_window: int = 12):
+    def __init__(self, time_windows: List[int] = [12]):
         """
         Initialize the feature engineering class.
         
         Parameters:
         -----------
-        time_window : int
-            Time window in months for rolling calculations (default: 12 months)
+        time_windows : List[int]
+            List of time windows in months for rolling calculations (default: [12])
+            Example: [2, 6, 12] will create features for 2, 6, and 12 month windows
         """
-        self.time_window = time_window
+        self.time_windows = time_windows if isinstance(time_windows, list) else [time_windows]
+        print(f"Initialized with time windows: {self.time_windows} months")
         
     def load_eurusd_data(self, file_path: str = "EURUSD.csv") -> pd.DataFrame:
         """
@@ -201,7 +203,7 @@ class EconomicIndicatorsFeatureEngineering:
     
     def generate_rolling_features(self, monthly_returns: pd.DataFrame) -> pd.DataFrame:
         """
-        Generate rolling economic indicator features.
+        Generate rolling economic indicator features for multiple time windows.
         Creates two feature groups: Buy (using returns as-is) and Sell (using inverted returns).
         
         Parameters:
@@ -216,44 +218,51 @@ class EconomicIndicatorsFeatureEngineering:
         """
         feature_df = pd.DataFrame(index=monthly_returns.index)
         
-        print(f"Generating rolling features with {self.time_window}-month window...")
+        print(f"Generating rolling features for time windows: {self.time_windows} months")
         print(f"Starting with {len(monthly_returns)} monthly returns")
         
-        processed_windows = 0
-        skipped_windows = 0
+        # Process each time window
+        for time_window in self.time_windows:
+            print(f"\n   Processing {time_window}-month window...")
+            
+            processed_windows = 0
+            skipped_windows = 0
+            
+            for i in range(time_window, len(monthly_returns)):
+                current_date = monthly_returns.index[i]
+                
+                # Get returns for the current time window
+                window_returns = monthly_returns.iloc[i-time_window:i]['Monthly_Return']
+                
+                # Skip if window has too few data points
+                if len(window_returns.dropna()) < 2:
+                    skipped_windows += 1
+                    continue
+                
+                # Calculate metrics for Buy scenario (returns as-is, multiply by 1)
+                buy_returns = window_returns * 1
+                buy_metrics = self.calculate_performance_metrics(buy_returns)
+                for metric_name, metric_value in buy_metrics.items():
+                    col_name = f'Buy_{metric_name}_{time_window}M'
+                    if col_name not in feature_df.columns:
+                        feature_df[col_name] = np.nan
+                    feature_df.loc[current_date, col_name] = metric_value
+                
+                # Calculate metrics for Sell scenario (inverted returns, multiply by -1)
+                sell_returns = window_returns * -1
+                sell_metrics = self.calculate_performance_metrics(sell_returns)
+                for metric_name, metric_value in sell_metrics.items():
+                    col_name = f'Sell_{metric_name}_{time_window}M'
+                    if col_name not in feature_df.columns:
+                        feature_df[col_name] = np.nan
+                    feature_df.loc[current_date, col_name] = metric_value
+                
+                processed_windows += 1
+            
+            print(f"      {time_window}M window: Processed {processed_windows} windows, skipped {skipped_windows} windows")
         
-        for i in range(self.time_window, len(monthly_returns)):
-            current_date = monthly_returns.index[i]
-            
-            # Get returns for the current time window
-            window_returns = monthly_returns.iloc[i-self.time_window:i]['Monthly_Return']
-            
-            # Skip if window has too few data points
-            if len(window_returns.dropna()) < 2:
-                skipped_windows += 1
-                continue
-            
-            # Calculate metrics for Buy scenario (returns as-is, multiply by 1)
-            buy_returns = window_returns * 1
-            buy_metrics = self.calculate_performance_metrics(buy_returns)
-            for metric_name, metric_value in buy_metrics.items():
-                col_name = f'Buy_{metric_name}'
-                if col_name not in feature_df.columns:
-                    feature_df[col_name] = np.nan
-                feature_df.loc[current_date, col_name] = metric_value
-            
-            # Calculate metrics for Sell scenario (inverted returns, multiply by -1)
-            sell_returns = window_returns * -1
-            sell_metrics = self.calculate_performance_metrics(sell_returns)
-            for metric_name, metric_value in sell_metrics.items():
-                col_name = f'Sell_{metric_name}'
-                if col_name not in feature_df.columns:
-                    feature_df[col_name] = np.nan
-                feature_df.loc[current_date, col_name] = metric_value
-            
-            processed_windows += 1
-        
-        print(f"   Processed {processed_windows} windows, skipped {skipped_windows} windows with insufficient data")
+        print(f"\n   Total features generated: {len(feature_df.columns)}")
+        print(f"   Feature rows available: {len(feature_df.dropna())}")
         
         return feature_df
 
@@ -312,9 +321,9 @@ class EconomicIndicatorsFeatureEngineering:
 def main():
     """Main function to run the feature engineering pipeline."""
     
-    # Initialize feature engineering class
+    # Initialize feature engineering class with multiple time windows
     feature_engineer = EconomicIndicatorsFeatureEngineering(
-        time_window=2              # 6-month rolling window
+        time_windows=[2, 6, 12]  # 2-month, 6-month, and 12-month rolling windows
     )
     
     # Run the complete pipeline
@@ -330,6 +339,11 @@ def main():
         
         print(f"\n=== Sample Features (Last 5 rows) ===")
         print(features.tail())
+        
+        print(f"\n=== Features by Time Window ===")
+        for window in feature_engineer.time_windows:
+            window_cols = [col for col in features.columns if f'_{window}M' in col]
+            print(f"   {window}-month window: {len(window_cols)} features")
         
     except Exception as e:
         print(f"Error in feature engineering pipeline: {e}")

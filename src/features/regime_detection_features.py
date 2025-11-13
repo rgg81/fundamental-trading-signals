@@ -731,9 +731,9 @@ class RegimeDetectionFeatureEngineering:
         # Add all regime detection feature types
         price_features = self.add_structural_break_features(price_features, all_base_features)
         price_features = self.add_cycle_detection_features(price_features, all_base_features)
-        #price_features = self.add_market_state_features(price_features, all_base_features)
-        #price_features = self.add_volatility_regime_features(price_features, all_base_features)
-        #price_features = self.add_cross_asset_regime_features(price_features, all_base_features)
+        price_features = self.add_market_state_features(price_features, all_base_features)
+        price_features = self.add_volatility_regime_features(price_features, all_base_features)
+        price_features = self.add_cross_asset_regime_features(price_features, all_base_features)
 
         print(f"  Generating Labels one month ahead")
         price = price_features['EURUSD_Close']
@@ -790,7 +790,7 @@ def main():
     
     # Initialize regime detection feature engineering class
     feature_engineer = RegimeDetectionFeatureEngineering(
-        windows=[12]  # 3, 6, and 12 month windows
+        windows=[6, 12, 24]  # 6, 12, and 24 month windows
     )
     
     # Run the complete pipeline

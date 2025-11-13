@@ -2,11 +2,12 @@ import pandas as pd
 from signals.strategy import RandomStrategy
 
 class Backtest:
-    def __init__(self, strategy, max_amount=10, stop_loss=0.015, close_col='Close'):
+    def __init__(self, strategy, max_amount=10, stop_loss=0.015, close_col='Close', min_history=154):
         self.strategy = strategy
         self.max_amount = max_amount
         self.stop_loss = stop_loss
         self.close_col = close_col
+        self.min_history = min_history
 
     def run(self, data):
         """
@@ -23,7 +24,7 @@ class Backtest:
             current_data_frame = data.iloc[i:current_step]
             past_data = data.iloc[:current_step]
 
-            if past_data.empty or i < 154 or current_data_frame.empty:  # Ensure we have enough past data for the strategy
+            if past_data.empty or i < self.min_history or current_data_frame.empty:  # Ensure we have enough past data for the strategy
                 # Skip the first row since there's no past data
                 continue
 

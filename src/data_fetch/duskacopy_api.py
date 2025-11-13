@@ -12,7 +12,8 @@ LIVE_MODE = True
 DOWNLOAD_DIR = "download"
 HISTORICAL_DAYS = 9200
 CHUNK_DAYS = 300
-SYMBOLS = ["EURUSD", "usa500idxusd", "USDJPY"]
+#SYMBOLS = ["EURUSD", "usa500idxusd", "USDJPY"]
+SYMBOLS = ["USDJPY"]
 
 
 def ensure_download_directory():

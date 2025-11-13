@@ -480,11 +480,11 @@ class TechnicalIndicatorsFeatureEngineering:
         
         # Combine all features
         all_features = pd.concat([
-          # trend_features,
-          # momentum_features, 
-          # volatility_features,
-            oscillator_features,
-         #   custom_features
+           trend_features,
+           momentum_features, 
+           volatility_features,
+           oscillator_features,
+           custom_features
         ], axis=1)
         
         print(f"   Generated {all_features.shape[1]} technical indicators")
@@ -545,7 +545,7 @@ def main():
     
     # Initialize feature engineering class with different lookback periods
     feature_engineer = TechnicalIndicatorsFeatureEngineering(
-        lookback_periods=[18]  # 3, 6, 12, and 24 months
+        lookback_periods=[9, 18]  # 9 and 18 months
     )
     
     # Run the complete pipeline

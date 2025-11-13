@@ -517,7 +517,7 @@ class SpreadFeatureEngineering:
 def main():
     """Main function to run the spread feature engineering pipeline."""
     
-    # Initialize feature engineering class with 3 and 6 month windows
+    # Initialize feature engineering class with 3, 12, and 24 month windows
     feature_engineer = SpreadFeatureEngineering(
         windows=[3, 12, 24]
     )
