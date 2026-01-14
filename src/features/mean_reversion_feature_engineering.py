@@ -8,30 +8,37 @@ warnings.filterwarnings('ignore')
 
 class MeanReversionFeatureEngineering:
     """
-    Feature engineering class that creates mean reversion indicators from EURUSD close prices.
+    Feature engineering class that creates mean reversion indicators from FX price data.
+    Supports multiple currency pairs (EURUSD, USDJPY, etc.).
     Focuses on sideways market behaviors, support/resistance levels, and reversal signals.
     Optimized for monthly data analysis in ranging/consolidating markets.
     """
     
-    def __init__(self, lookback_periods: List[int] = [3, 6, 12]):
+    def __init__(self, lookback_periods: List[int] = [3, 6, 12], currency_pairs: List[str] = ['EURUSD']):
         """
         Initialize the mean reversion feature engineering class.
         
         Parameters:
         -----------
         lookback_periods : List[int]
-            Different lookback periods for indicators (default: [6, 12, 24] months)
+            Different lookback periods for indicators (default: [3, 6, 12] months)
+        currency_pairs : List[str]
+            List of currency pairs to process (default: ['EURUSD'])
+            Supported pairs: 'EURUSD', 'USDJPY', etc.
         """
         self.lookback_periods = lookback_periods
+        self.currency_pairs = currency_pairs
         
-    def load_eurusd_data(self, file_path: str = "EURUSD.csv") -> pd.DataFrame:
+    def load_eurusd_data(self, file_path: str = "EURUSD.csv", currency_pair: str = "EURUSD") -> pd.DataFrame:
         """
-        Load EURUSD data from CSV file and convert to monthly data.
+        Load FX data from CSV file and convert to monthly data.
         
         Parameters:
         -----------
         file_path : str
-            Path to the EURUSD CSV file
+            Path to the FX CSV file
+        currency_pair : str
+            Currency pair symbol (e.g., 'EURUSD', 'USDJPY')
             
         Returns:
         --------
@@ -43,21 +50,32 @@ class MeanReversionFeatureEngineering:
             df['Date'] = pd.to_datetime(df['Date'])
             df = df.set_index('Date')
             
+            # Construct column names based on currency pair
+            open_col = f'{currency_pair}_Open'
+            high_col = f'{currency_pair}_High'
+            low_col = f'{currency_pair}_Low'
+            close_col = f'{currency_pair}_Close'
+            
+            # Check if columns exist
+            if open_col not in df.columns:
+                raise ValueError(f"Column {open_col} not found in {file_path}. Available columns: {df.columns.tolist()}")
+            
             # Convert to monthly data (OHLC)
             monthly_data = pd.DataFrame()
-            monthly_data['Open'] = df['EURUSD_Open'].resample('ME').first()
-            monthly_data['High'] = df['EURUSD_High'].resample('ME').max()
-            monthly_data['Low'] = df['EURUSD_Low'].resample('ME').min()
-            monthly_data['Close'] = df['EURUSD_Close'].resample('ME').last()
+            monthly_data['Open'] = df[open_col].resample('ME').first()
+            monthly_data['High'] = df[high_col].resample('ME').max()
+            monthly_data['Low'] = df[low_col].resample('ME').min()
+            monthly_data['Close'] = df[close_col].resample('ME').last()
             
             return monthly_data.dropna()
             
         except Exception as e:
-            raise ValueError(f"Error loading EURUSD data: {e}")
+            raise ValueError(f"Error loading {currency_pair} data from {file_path}: {e}")
     
     def generate_mean_reversion_indicators(self, df: pd.DataFrame) -> pd.DataFrame:
         """
         Generate mean reversion indicators optimized for sideways markets.
+        Keep only the most stationary and predictive features.
         
         Parameters:
         -----------
@@ -74,36 +92,21 @@ class MeanReversionFeatureEngineering:
         print("Generating mean reversion indicators...")
         
         for period in self.lookback_periods:
-            # 1. Price Distance from Moving Average (Z-Score)
+            # 1. Price Z-Score - Most stationary mean reversion indicator
             sma = df['Close'].rolling(period).mean()
             std = df['Close'].rolling(period).std()
-            features[f'Price_ZScore_{period}'] = (df['Close'] - sma) / std
+            features[f'mr_Price_ZScore_{period}'] = (df['Close'] - sma) / std
             
-            # 2. Bollinger Band Position (0-1 scale)
-            bb_high = ta.volatility.bollinger_hband(df['Close'], window=period)
-            bb_low = ta.volatility.bollinger_lband(df['Close'], window=period)
-            features[f'BB_Position_{period}'] = (df['Close'] - bb_low) / (bb_high - bb_low)
-            
-            # 3. RSI Divergence from 50 (mean reversion signal)
+            # 2. RSI - Bounded oscillator (0-100), highly stationary
             rsi = ta.momentum.rsi(df['Close'], window=period)
-            features[f'RSI_Divergence_{period}'] = abs(rsi - 50)
-            features[f'RSI_Oversold_{period}'] = (rsi < 30).astype(int)
-            features[f'RSI_Overbought_{period}'] = (rsi > 70).astype(int)
-            
-            # 4. Williams %R Extremes
-            williams_r = ta.momentum.williams_r(df['High'], df['Low'], df['Close'], lbp=period)
-            features[f'Williams_Extreme_{period}'] = ((williams_r < -80) | (williams_r > -20)).astype(int)
-            
-            # 5. Stochastic Oscillator Extremes
-            stoch_k = ta.momentum.stoch(df['High'], df['Low'], df['Close'], window=period)
-            features[f'Stoch_Oversold_{period}'] = (stoch_k < 20).astype(int)
-            features[f'Stoch_Overbought_{period}'] = (stoch_k > 80).astype(int)
+            features[f'mr_RSI_{period}'] = rsi
         
         return features
     
     def generate_support_resistance_indicators(self, df: pd.DataFrame) -> pd.DataFrame:
         """
         Generate support and resistance level indicators.
+        Keep only normalized distance measures (stationary).
         
         Parameters:
         -----------
@@ -120,34 +123,13 @@ class MeanReversionFeatureEngineering:
         print("Generating support/resistance indicators...")
         
         for period in self.lookback_periods:
-            # 1. Distance to Rolling High/Low (support/resistance levels)
+            # Normalized distance to range extremes - stationary and predictive
             rolling_high = df['High'].rolling(period).max()
             rolling_low = df['Low'].rolling(period).min()
+            range_size = rolling_high - rolling_low
             
-            features[f'Distance_To_High_{period}'] = (rolling_high - df['Close']) / df['Close']
-            features[f'Distance_To_Low_{period}'] = (df['Close'] - rolling_low) / df['Close']
-            
-            # 2. Price near Support/Resistance (within 2% of extremes)
-            threshold = 0.02  # 2% threshold
-            features[f'Near_Resistance_{period}'] = (features[f'Distance_To_High_{period}'] < threshold).astype(int)
-            features[f'Near_Support_{period}'] = (features[f'Distance_To_Low_{period}'] < threshold).astype(int)
-            
-            # 3. Donchian Channel Position
-            dc_high = ta.volatility.donchian_channel_hband(df['High'], df['Low'], df['Close'], window=period)
-            dc_low = ta.volatility.donchian_channel_lband(df['High'], df['Low'], df['Close'], window=period)
-            features[f'Donchian_Position_{period}'] = (df['Close'] - dc_low) / (dc_high - dc_low)
-            
-            # 4. Price Reversal Signals (price bouncing off extremes)
-            prev_close = df['Close'].shift(1)
-            features[f'Reversal_From_High_{period}'] = ((prev_close >= rolling_high.shift(1) * 0.98) & 
-                                                       (df['Close'] < prev_close)).astype(int)
-            features[f'Reversal_From_Low_{period}'] = ((prev_close <= rolling_low.shift(1) * 1.02) & 
-                                                      (df['Close'] > prev_close)).astype(int)
-            
-            # 5. Range-bound Market Detection
-            range_size = (rolling_high - rolling_low) / df['Close'].rolling(period).mean()
-            features[f'Range_Size_{period}'] = range_size
-            features[f'Tight_Range_{period}'] = (range_size < range_size.rolling(period).quantile(0.3)).astype(int)
+            # Position within range (0 = at low, 1 = at high) - bounded and stationary
+            features[f'support_Range_Position_{period}'] = (df['Close'] - rolling_low) / range_size
         
         return features
     
@@ -167,35 +149,12 @@ class MeanReversionFeatureEngineering:
         """
         features = pd.DataFrame(index=df.index)
         
-        print("Generating volatility contraction indicators...")
+        print("Generating volatility indicators...")
         
         for period in self.lookback_periods:
-            # 1. Bollinger Band Squeeze
-            bb_high = ta.volatility.bollinger_hband(df['Close'], window=period)
-            bb_low = ta.volatility.bollinger_lband(df['Close'], window=period)
-            kc_high = ta.volatility.keltner_channel_hband(df['High'], df['Low'], df['Close'], window=period)
-            kc_low = ta.volatility.keltner_channel_lband(df['High'], df['Low'], df['Close'], window=period)
-            
-            features[f'BB_Squeeze_{period}'] = ((bb_high < kc_high) & (bb_low > kc_low)).astype(int)
-            
-            # 2. Average True Range Compression
+            # Normalized ATR - stationary volatility measure
             atr = ta.volatility.average_true_range(df['High'], df['Low'], df['Close'], window=period)
-            atr_ma = atr.rolling(period).mean()
-            features[f'ATR_Compression_{period}'] = atr / atr_ma
-            features[f'Low_Volatility_{period}'] = (features[f'ATR_Compression_{period}'] < 0.8).astype(int)
-            
-            # 3. High-Low Range Contraction
-            hl_range = (df['High'] - df['Low']) / df['Close']
-            avg_range = hl_range.rolling(period).mean()
-            features[f'Range_Contraction_{period}'] = hl_range / avg_range
-            features[f'Narrow_Range_{period}'] = (features[f'Range_Contraction_{period}'] < 0.7).astype(int)
-            
-            # 4. Price Stability (low standard deviation)
-            price_std = df['Close'].rolling(period).std()
-            price_mean = df['Close'].rolling(period).mean()
-            features[f'Price_Stability_{period}'] = price_std / price_mean
-            features[f'Stable_Price_{period}'] = (features[f'Price_Stability_{period}'] < 
-                                                features[f'Price_Stability_{period}'].rolling(period).quantile(0.3)).astype(int)
+            features[f'volatility_ATR_Ratio_{period}'] = atr / df['Close']
         
         return features
     
@@ -215,34 +174,12 @@ class MeanReversionFeatureEngineering:
         """
         features = pd.DataFrame(index=df.index)
         
-        print("Generating momentum exhaustion indicators...")
+        print("Generating momentum indicators...")
         
         for period in self.lookback_periods:
-            # 1. MACD Signal Line Crossover
-            macd_line = ta.trend.macd(df['Close'], window_slow=period, window_fast=period//2)
-            macd_signal = ta.trend.macd_signal(df['Close'], window_slow=period, window_fast=period//2)
-            features[f'MACD_Bullish_Cross_{period}'] = ((macd_line > macd_signal) & 
-                                                       (macd_line.shift(1) <= macd_signal.shift(1))).astype(int)
-            features[f'MACD_Bearish_Cross_{period}'] = ((macd_line < macd_signal) & 
-                                                       (macd_line.shift(1) >= macd_signal.shift(1))).astype(int)
-            
-            # 2. ROC (Rate of Change) Deceleration
+            # ROC - percentage change (stationary)
             roc = ta.momentum.roc(df['Close'], window=period)
-            roc_change = roc - roc.shift(1)
-            features[f'ROC_Deceleration_{period}'] = roc_change
-            features[f'Momentum_Exhaustion_{period}'] = ((roc > 0) & (roc_change < 0)).astype(int) | \
-                                                       ((roc < 0) & (roc_change > 0)).astype(int)
-            
-            # 3. Commodity Channel Index (CCI) Extremes and Reversals
-            cci = ta.trend.cci(df['High'], df['Low'], df['Close'], window=period)
-            features[f'CCI_Extreme_{period}'] = ((cci > 100) | (cci < -100)).astype(int)
-            features[f'CCI_Reversal_{period}'] = ((cci.shift(1) > 100) & (cci < 100)).astype(int) | \
-                                                 ((cci.shift(1) < -100) & (cci > -100)).astype(int)
-            
-            # 4. Awesome Oscillator Zero Line Cross
-            ao = ta.momentum.awesome_oscillator(df['High'], df['Low'], window1=period//2, window2=period)
-            features[f'AO_Zero_Cross_{period}'] = ((ao > 0) & (ao.shift(1) <= 0)).astype(int) | \
-                                                  ((ao < 0) & (ao.shift(1) >= 0)).astype(int)
+            features[f'momentum_ROC_{period}'] = roc
         
         return features
     
@@ -262,61 +199,11 @@ class MeanReversionFeatureEngineering:
         """
         features = pd.DataFrame(index=df.index)
         
-        print("Generating custom mean reversion indicators...")
+        print("Generating custom indicators...")
         
         for period in self.lookback_periods:
-            # 1. Percentage of Time in Upper/Lower Half of Range
-            rolling_high = df['High'].rolling(period).max()
-            rolling_low = df['Low'].rolling(period).min()
-            range_midpoint = (rolling_high + rolling_low) / 2
-            
-            above_mid = (df['Close'] > range_midpoint).rolling(period).mean()
-            features[f'Time_Above_Mid_{period}'] = above_mid
-            features[f'Range_Extreme_{period}'] = ((above_mid > 0.8) | (above_mid < 0.2)).astype(int)
-            
-            # 2. Consecutive Periods in Same Direction (trend exhaustion)
-            price_direction = (df['Close'] > df['Close'].shift(1)).astype(int)
-            consecutive_up = (price_direction.rolling(period).sum() == period).astype(int)
-            consecutive_down = (price_direction.rolling(period).sum() == 0).astype(int)
-            features[f'Trend_Exhaustion_{period}'] = consecutive_up | consecutive_down
-            
-            # 3. Mean Reversion Speed (how fast price returns to mean)
-            sma = df['Close'].rolling(period).mean()
-            distance_from_mean = abs(df['Close'] - sma)
-            features[f'Distance_From_Mean_{period}'] = distance_from_mean / sma
-            
-            # Price returning to mean signal
-            was_far_from_mean = distance_from_mean.shift(1) > distance_from_mean.shift(1).rolling(period).quantile(0.7)
-            is_close_to_mean = distance_from_mean < distance_from_mean.rolling(period).quantile(0.3)
-            features[f'Return_To_Mean_{period}'] = (was_far_from_mean & is_close_to_mean).astype(int)
-            
-            # 4. False Breakout Detection
-            breakout_up = df['Close'] > rolling_high.shift(1)
-            breakout_down = df['Close'] < rolling_low.shift(1)
-            
-            # False breakout if price breaks but then reverses quickly
-            false_breakout_up = (breakout_up.shift(1) & (df['Close'] < rolling_high.shift(2))).astype(int)
-            false_breakout_down = (breakout_down.shift(1) & (df['Close'] > rolling_low.shift(2))).astype(int)
-            features[f'False_Breakout_{period}'] = false_breakout_up | false_breakout_down
-            
-            # 5. Oscillator Divergence (price makes new high/low but oscillator doesn't)
-            rsi = ta.momentum.rsi(df['Close'], window=period)
-            
-            # Price making new highs but RSI not confirming
-            price_new_high = df['Close'] == df['Close'].rolling(period//2).max()
-            rsi_lower_high = rsi < rsi.shift(period//4)
-            bearish_divergence = (price_new_high & rsi_lower_high).astype(int)
-            
-            # Price making new lows but RSI not confirming  
-            price_new_low = df['Close'] == df['Close'].rolling(period//2).min()
-            rsi_higher_low = rsi > rsi.shift(period//4)
-            bullish_divergence = (price_new_low & rsi_higher_low).astype(int)
-            
-            features[f'Bullish_Divergence_{period}'] = bullish_divergence
-            features[f'Bearish_Divergence_{period}'] = bearish_divergence
-        
-            features[f'Channel_Top_{period}'] = ((df['Close'] - sma) / sma > 0.01).astype(int)
-            features[f'Channel_Bottom_{period}'] = ((sma - df['Close']) / sma > 0.01).astype(int)
+            # Normalized return (stationary)
+            features[f'custom_Return_{period}'] = df['Close'].pct_change(period)
         
         return features
     
@@ -393,14 +280,18 @@ class MeanReversionFeatureEngineering:
             else:
                 period_priority = 15  # Default medium priority
             
-            # Feature type priority (prefer certain indicator types for mean reversion)
+            # Feature type priority (based on prefix)
             feature_type_priority = 0
-            if any(x in feature_name for x in ['RSI_', 'BB_Position', 'Price_ZScore', 'Distance_To_']):
-                feature_type_priority = 5  # High priority for key mean reversion indicators
-            elif any(x in feature_name for x in ['Williams_', 'Stoch_', 'MACD_', 'Reversal_']):
-                feature_type_priority = 3  # Medium priority
-            elif any(x in feature_name for x in ['Range_', 'Volatility', 'Squeeze']):
-                feature_type_priority = 2  # Lower priority
+            if feature_name.startswith('mr_'):
+                feature_type_priority = 15  # Highest - mean reversion indicators
+            elif feature_name.startswith('support_'):
+                feature_type_priority = 10  # Important - position in range
+            elif feature_name.startswith('volatility_'):
+                feature_type_priority = 8   # Volatility measure
+            elif feature_name.startswith('momentum_'):
+                feature_type_priority = 6   # Momentum
+            elif feature_name.startswith('custom_'):
+                feature_type_priority = 4   # Custom features
             
             return period_priority + feature_type_priority
         
@@ -509,21 +400,25 @@ class MeanReversionFeatureEngineering:
         return selected_features
     
     def run_feature_engineering(self, 
-                               eurusd_file_path: str = "EURUSD.csv",
+                               fx_file_path: str = None,
+                               currency_pair: str = None,
                                save_features: bool = True,
-                               output_file: str = "mean_reversion_features.csv",
+                               output_file: str = None,
                                correlation_threshold: float = 0.7) -> pd.DataFrame:
         """
-        Run the complete mean reversion feature engineering pipeline.
+        Run the complete mean reversion feature engineering pipeline for a specific currency pair.
         
         Parameters:
         -----------
-        eurusd_file_path : str
-            Path to EURUSD CSV file
+        fx_file_path : str
+            Path to FX CSV file (default: constructs from currency_pair)
+        currency_pair : str
+            Currency pair to process (e.g., 'EURUSD', 'USDJPY')
+            If None, uses first pair from self.currency_pairs
         save_features : bool
             Whether to save features to CSV
         output_file : str
-            Output CSV filename
+            Output CSV filename (default: auto-generated based on currency_pair)
         correlation_threshold : float
             Threshold for correlation analysis
             
@@ -532,11 +427,22 @@ class MeanReversionFeatureEngineering:
         pd.DataFrame
             DataFrame with mean reversion features
         """
-        print("=== Mean Reversion Feature Engineering Pipeline ===")
+        # Set default currency pair
+        if currency_pair is None:
+            currency_pair = self.currency_pairs[0]
+        
+        # Set default file paths
+        if fx_file_path is None:
+            fx_file_path = f"{currency_pair}.csv"
+        
+        if output_file is None:
+            output_file = f"mean_reversion_features_{currency_pair}.csv"
+        
+        print(f"=== Mean Reversion Feature Engineering Pipeline for {currency_pair} ===")
         
         # Step 1: Load and prepare data
-        print("1. Loading EURUSD data...")
-        monthly_data = self.load_eurusd_data(eurusd_file_path)
+        print(f"1. Loading {currency_pair} data from {fx_file_path}...")
+        monthly_data = self.load_eurusd_data(fx_file_path, currency_pair)
         print(f"   Loaded {len(monthly_data)} monthly observations")
         print(f"   Date range: {monthly_data.index[0].strftime('%Y-%m')} to {monthly_data.index[-1].strftime('%Y-%m')}")
         
@@ -593,16 +499,16 @@ class MeanReversionFeatureEngineering:
             print(f"   Features saved to {output_file}")
             print(f"   Correlations saved to {corr_file}")
         
-        print("\n=== Feature Engineering Complete ===")
+        print(f"\n=== Feature Engineering Complete for {currency_pair} ===")
         print(f"Final dataset shape: {selected_features.shape}")
         
         # Print feature categories summary
         categories = {
-            'Mean Reversion': [col for col in selected_features.columns if any(x in col for x in ['Price_ZScore', 'BB_Position', 'RSI_', 'Williams_', 'Stoch_'])],
-            'Support/Resistance': [col for col in selected_features.columns if any(x in col for x in ['Distance_To_', 'Near_', 'Donchian_', 'Reversal_', 'Range_'])],
-            'Volatility Contraction': [col for col in selected_features.columns if any(x in col for x in ['BB_Squeeze', 'ATR_Compression', 'Range_Contraction', 'Price_Stability', 'Low_Volatility', 'Narrow_Range', 'Stable_Price'])],
-            'Momentum Exhaustion': [col for col in selected_features.columns if any(x in col for x in ['MACD_', 'ROC_', 'CCI_', 'AO_', 'Momentum_Exhaustion'])],
-            'Custom Mean Reversion': [col for col in selected_features.columns if any(x in col for x in ['Time_Above_Mid', 'Trend_Exhaustion', 'Return_To_Mean', 'False_Breakout', 'Divergence', 'Channel_'])]
+            'Mean Reversion (mr_)': [col for col in selected_features.columns if col.startswith('mr_')],
+            'Support/Resistance (support_)': [col for col in selected_features.columns if col.startswith('support_')],
+            'Volatility (volatility_)': [col for col in selected_features.columns if col.startswith('volatility_')],
+            'Momentum (momentum_)': [col for col in selected_features.columns if col.startswith('momentum_')],
+            'Custom (custom_)': [col for col in selected_features.columns if col.startswith('custom_')]
         }
         
         print("\nFeature categories:")
@@ -610,56 +516,114 @@ class MeanReversionFeatureEngineering:
             print(f"  {category}: {len(features)} features")
         
         return selected_features
+    
+    def run_feature_engineering_all_pairs(self,
+                                         save_features: bool = True,
+                                         correlation_threshold: float = 0.7) -> Dict[str, pd.DataFrame]:
+        """
+        Run feature engineering for all configured currency pairs.
+        
+        Parameters:
+        -----------
+        save_features : bool
+            Whether to save features to CSV
+        correlation_threshold : float
+            Threshold for correlation analysis
+            
+        Returns:
+        --------
+        Dict[str, pd.DataFrame]
+            Dictionary mapping currency pair to its features DataFrame
+        """
+        print("="*80)
+        print("=== Mean Reversion Feature Engineering - All Currency Pairs ===")
+        print(f"Processing {len(self.currency_pairs)} currency pair(s): {', '.join(self.currency_pairs)}")
+        print("="*80)
+        
+        all_pair_features = {}
+        
+        for pair in self.currency_pairs:
+            print(f"\n{'='*80}")
+            try:
+                features = self.run_feature_engineering(
+                    fx_file_path=f"{pair}.csv",
+                    currency_pair=pair,
+                    save_features=save_features,
+                    output_file=f"mean_reversion_features_{pair}.csv",
+                    correlation_threshold=correlation_threshold
+                )
+                all_pair_features[pair] = features
+                print(f"✅ Successfully processed {pair}")
+            except Exception as e:
+                print(f"❌ Error processing {pair}: {e}")
+                continue
+        
+        print(f"\n{'='*80}")
+        print(f"=== Processing Complete ===")
+        print(f"Successfully processed {len(all_pair_features)}/{len(self.currency_pairs)} currency pairs")
+        print("="*80)
+        
+        return all_pair_features
 
 
 def main():
     """Main function to run the mean reversion feature engineering pipeline."""
     
-    # Initialize feature engineering class with different lookback periods
+    # Initialize feature engineering class with different lookback periods and currency pairs
     feature_engineer = MeanReversionFeatureEngineering(
-        lookback_periods=[6, 12, 24]  # 6, 12, and 24 months
+        lookback_periods=[2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21],  # 6, 12, and 24 months
+        currency_pairs=["EURUSD", "USDJPY", "EURJPY", "AUDUSD", "XAUUSD", "GBPUSD"]  # Multiple currency pairs
     )
     
-    # Run the complete pipeline
+    # Run the complete pipeline for all currency pairs
     try:
-        features = feature_engineer.run_feature_engineering(
-            eurusd_file_path="EURUSD.csv",
+        # Process all currency pairs
+        all_features = feature_engineer.run_feature_engineering_all_pairs(
             save_features=True,
-            output_file="mean_reversion_features.csv",
             correlation_threshold=1.0  # Threshold for final analysis
         )
         
-        print("\n=== Summary Statistics ===")
-        print(features.describe())
+        # Display summary for each currency pair
+        for pair, features in all_features.items():
+            print(f"\n{'='*80}")
+            print(f"=== Summary for {pair} ===")
+            print(f"{'='*80}")
+            
+            print("\n=== Summary Statistics ===")
+            print(features.describe())
+            
+            print(f"\n=== Sample Features (Last 5 rows) ===")
+            print(features.tail())
+            
+            print(f"\n=== Feature List ({len(features.columns)} features) ===")
+            for i, col in enumerate(features.columns, 1):
+                print(f"{i:2d}. {col}")
+            
+            # Final validation - check correlation matrix one more time
+            print(f"\n=== Final Correlation Validation ===")
+            final_corr = features.corr().abs()
+            max_corr = 0
+            max_pair_corr = None
+            
+            for i in range(len(final_corr.columns)):
+                for j in range(i+1, len(final_corr.columns)):
+                    corr_val = final_corr.iloc[i, j]
+                    if corr_val > max_corr:
+                        max_corr = corr_val
+                        max_pair_corr = (final_corr.columns[i], final_corr.columns[j])
+            
+            print(f"Maximum correlation between final features: {max_corr:.3f}")
+            if max_pair_corr:
+                print(f"  Between: {max_pair_corr[0]} and {max_pair_corr[1]}")
+            
+            if max_corr < 0.5:
+                print(f"✅ All {pair} features have correlation < 0.5")
+            else:
+                print(f"⚠️ Some {pair} features still have high correlation")
         
-        print(f"\n=== Sample Features (Last 5 rows) ===")
-        print(features.tail())
-        
-        print(f"\n=== Feature List ===")
-        for i, col in enumerate(features.columns, 1):
-            print(f"{i:2d}. {col}")
-        
-        # Final validation - check correlation matrix one more time
-        print(f"\n=== Final Correlation Validation ===")
-        final_corr = features.corr().abs()
-        max_corr = 0
-        max_pair = None
-        
-        for i in range(len(final_corr.columns)):
-            for j in range(i+1, len(final_corr.columns)):
-                corr_val = final_corr.iloc[i, j]
-                if corr_val > max_corr:
-                    max_corr = corr_val
-                    max_pair = (final_corr.columns[i], final_corr.columns[j])
-        
-        print(f"Maximum correlation between final features: {max_corr:.3f}")
-        if max_pair:
-            print(f"  Between: {max_pair[0]} and {max_pair[1]}")
-        
-        if max_corr < 0.5:
-            print("✅ All features have correlation < 0.5")
-        else:
-            print("⚠️ Some features still have high correlation")
+        print(f"\n{'='*80}")
+        print(f"=== All Currency Pairs Processed Successfully ===")
+        print(f"{'='*80}")
         
     except Exception as e:
         print(f"Error in mean reversion pipeline: {e}")

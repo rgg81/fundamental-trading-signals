@@ -24,7 +24,8 @@ class RegimeDetectionFeatureEngineering:
     - Correlation regimes between spreads
     """
     
-    def __init__(self, windows: List[int] = [3, 6, 12]):
+    def __init__(self, windows: List[int] = [3, 6, 12], 
+                 currency_pairs: List[str] = ['EURUSD']):
         """
         Initialize the regime detection feature engineering class.
         
@@ -32,54 +33,85 @@ class RegimeDetectionFeatureEngineering:
         -----------
         windows : List[int]
             Different windows for calculations (default: [3, 6, 12] months)
+        currency_pairs : List[str]
+            List of currency pairs to process (default: ['EURUSD'])
         """
         self.windows = windows
+        self.currency_pairs = currency_pairs
         
-    def load_eurusd_data(self, file_path: str = "EURUSD.csv") -> pd.DataFrame:
+    def load_eurusd_data(self, file_path: str = "EURUSD.csv", 
+                         currency_pair: str = "EURUSD") -> pd.DataFrame:
         """
-        Load EURUSD price data from CSV file.
+        Load FX price data from CSV file.
+        
+        Parameters:
+        -----------
+        file_path : str
+            Path to the CSV file containing FX data
+        currency_pair : str
+            Currency pair symbol (e.g., 'EURUSD', 'USDJPY')
         """
         try:
             df = pd.read_csv(file_path, parse_dates=["Date"], index_col="Date")
+            
+            # Construct dynamic column names
+            close_col = f'{currency_pair}_Close'
+            
+            # Validate required columns exist
+            if close_col not in df.columns:
+                raise ValueError(f"Column {close_col} not found in {file_path}. "
+                               f"Available columns: {list(df.columns)}")
+            
             print(f"   Loaded data shape: {df.shape}")
             print(f"   Missing values per column: {df.isnull().sum().to_dict()}")
             print(f"   Available columns: {list(df.columns)}")
             return df
         except Exception as e:
-            raise ValueError(f"Error loading EURUSD data: {e}")
+            raise ValueError(f"Error loading {currency_pair} data from {file_path}: {e}")
     
-    def generate_price_features(self, df: pd.DataFrame) -> pd.DataFrame:
+    def generate_price_features(self, df: pd.DataFrame, 
+                               currency_pair: str = "EURUSD") -> pd.DataFrame:
         """
-        Generate price-based features from EURUSD data.
+        Generate price-based features from FX data.
+        
+        Parameters:
+        -----------
+        df : pd.DataFrame
+            DataFrame containing FX price data
+        currency_pair : str
+            Currency pair symbol (e.g., 'EURUSD', 'USDJPY')
         """
         features = pd.DataFrame(index=df.index)
         
         print("Generating price features...")
         
-        # 1. Use EURUSD Close price as base feature
-        if 'EURUSD_Close' in df.columns:
-            features['EURUSD_Close'] = df['EURUSD_Close']
-            print(f"   Added EURUSD_Close as base feature")
+        # Construct dynamic column name
+        close_col = f'{currency_pair}_Close'
+        
+        # 1. Use FX Close price as base feature
+        if close_col in df.columns:
+            features[f'{currency_pair}_Close'] = df[close_col]
+            print(f"   Added {close_col} as base feature")
             
             # 2. Generate additional price-based features for regime detection
             # Price returns (different periods)
-            #features['EURUSD_Return_1M'] = df['EURUSD_Close'].pct_change(periods=1)
-            #features['EURUSD_Return_3M'] = df['EURUSD_Close'].pct_change(periods=3)
-            #features['EURUSD_Return_6M'] = df['EURUSD_Close'].pct_change(periods=6)
+            #features[f'{currency_pair}_Return_1M'] = df[close_col].pct_change(periods=1)
+            #features[f'{currency_pair}_Return_3M'] = df[close_col].pct_change(periods=3)
+            #features[f'{currency_pair}_Return_6M'] = df[close_col].pct_change(periods=6)
             print(f"   Added return features for 1M, 3M, 6M periods")
             
             # Price momentum (log returns)
-            #features['EURUSD_LogReturn'] = np.log(df['EURUSD_Close'] / df['EURUSD_Close'].shift(1))
+            #features[f'{currency_pair}_LogReturn'] = np.log(df[close_col] / df[close_col].shift(1))
             #print(f"   Added log return feature")
             
             # Price relative to moving averages (trend indicators)
             for window in [12, 24, 36]:  # 1-year, 2-year, 3-year MAs
-                ma = df['EURUSD_Close'].rolling(window=window, min_periods=max(1, window//2)).mean()
-                features[f'EURUSD_vs_MA{window}'] = df['EURUSD_Close'] / ma - 1
+                ma = df[close_col].rolling(window=window, min_periods=max(1, window//2)).mean()
+                features[f'{currency_pair}_vs_MA{window}'] = df[close_col] / ma - 1
                 print(f"   Added price vs MA{window} feature")
             
         else:
-           raise ValueError("EURUSD_Close column not found in data")
+           raise ValueError(f"{close_col} column not found in data")
         
         return features
     
@@ -523,7 +555,8 @@ class RegimeDetectionFeatureEngineering:
         print(f"Generating cross-asset regime features (windows: {self.windows})...")
         
         # Create pairs of base price features for cross-timeframe analysis
-        base_features = [f for f in features if f in ['EURUSD_Close', 'EURUSD_Return_1M', 'EURUSD_Return_3M', 'EURUSD_Return_6M']]
+        # Match any currency pair pattern
+        base_features = [f for f in features if '_Close' in f or '_Return_' in f or '_vs_MA' in f]
         
         for i, feature1 in enumerate(base_features):
             for feature2 in base_features[i+1:]:
@@ -607,8 +640,8 @@ class RegimeDetectionFeatureEngineering:
             """Assign priority based on regime detection feature type."""
             priority = 0
             
-            # Base price features get highest priority
-            if feature_name in ['EURUSD_Close', 'EURUSD_Return_1M', 'EURUSD_Return_3M', 'EURUSD_Return_6M', 'EURUSD_LogReturn'] or 'EURUSD_vs_MA' in feature_name:
+            # Base price features get highest priority (any currency pair)
+            if '_Close' in feature_name or '_Return_' in feature_name or '_LogReturn' in feature_name or '_vs_MA' in feature_name:
                 priority += 100
             
             # Regime detection feature priorities
@@ -704,24 +737,48 @@ class RegimeDetectionFeatureEngineering:
         return selected_features
     
     def run_regime_detection_pipeline(self, 
-                                    eurusd_file_path: str = "EURUSD.csv",
+                                    fx_file_path: str = None,
+                                    currency_pair: str = None,
                                     save_features: bool = True,
-                                    output_file: str = "regime_detection_features.csv",
+                                    output_file: str = None,
                                     correlation_threshold: float = 0.7) -> pd.DataFrame:
         """
         Run the complete regime detection feature engineering pipeline.
+        
+        Parameters:
+        -----------
+        fx_file_path : str, optional
+            Path to the FX data CSV file. If None, defaults to "{currency_pair}.csv"
+        currency_pair : str, optional
+            Currency pair to process. If None, uses first pair in currency_pairs list
+        save_features : bool
+            Whether to save features to CSV
+        output_file : str, optional
+            Output filename. If None, auto-generates based on currency_pair
+        correlation_threshold : float
+            Threshold for removing correlated features
         """
-        print("=== Regime Detection Feature Engineering Pipeline ===")
+        # Set defaults
+        if currency_pair is None:
+            currency_pair = self.currency_pairs[0]
+        
+        if fx_file_path is None:
+            fx_file_path = f"{currency_pair}.csv"
+        
+        if output_file is None:
+            output_file = f"regime_detection_features_{currency_pair}.csv"
+        
+        print(f"=== Regime Detection Feature Engineering Pipeline for {currency_pair} ===")
         
         # Step 1: Load and prepare data
-        print("1. Loading EURUSD price data...")
-        eurusd_data = self.load_eurusd_data(eurusd_file_path)
-        print(f"   Loaded {len(eurusd_data)} monthly observations")
-        print(f"   Date range: {eurusd_data.index[0].strftime('%Y-%m')} to {eurusd_data.index[-1].strftime('%Y-%m')}")
+        print(f"1. Loading {currency_pair} price data from {fx_file_path}...")
+        fx_data = self.load_eurusd_data(fx_file_path, currency_pair)
+        print(f"   Loaded {len(fx_data)} monthly observations")
+        print(f"   Date range: {fx_data.index[0].strftime('%Y-%m')} to {fx_data.index[-1].strftime('%Y-%m')}")
         
         # Step 2: Generate basic price features
         print("2. Generating price features...")
-        price_features = self.generate_price_features(eurusd_data)
+        price_features = self.generate_price_features(fx_data, currency_pair)
         print(f"   Generated {len(price_features.columns)} basic price features")
         
         # Step 3: Generate all regime detection features
@@ -736,7 +793,8 @@ class RegimeDetectionFeatureEngineering:
         price_features = self.add_cross_asset_regime_features(price_features, all_base_features)
 
         print(f"  Generating Labels one month ahead")
-        price = price_features['EURUSD_Close']
+        close_col = f'{currency_pair}_Close'
+        price = price_features[close_col]
         price_returns = (price.shift(-1) > price).astype(int)  # 1 if next month's price is higher, else 0
         price_features['Label'] = price_returns
 
@@ -771,7 +829,9 @@ class RegimeDetectionFeatureEngineering:
         # Step 7: Save features
         if save_features:
             print(f"7. Saving features to {output_file}...")
-            valid_features = valid_features.drop("EURUSD_Close", axis=1) 
+            close_col = f'{currency_pair}_Close'
+            if close_col in valid_features.columns:
+                valid_features = valid_features.drop(close_col, axis=1)
             valid_features.to_csv(output_file)
             
             corr_file = output_file.replace('.csv', '_correlations.csv')
@@ -779,74 +839,123 @@ class RegimeDetectionFeatureEngineering:
             print(f"   Features saved to {output_file}")
             print(f"   Correlations saved to {corr_file}")
         
-        print("\n=== Regime Detection Feature Engineering Complete ===")
+        print(f"\n=== Regime Detection Feature Engineering Complete for {currency_pair} ===")
         print(f"Final dataset shape: {valid_features.shape}")
         
         return valid_features
+    
+    def run_regime_detection_all_pairs(self,
+                                      save_features: bool = True,
+                                      correlation_threshold: float = 0.7) -> Dict[str, pd.DataFrame]:
+        """
+        Run regime detection feature engineering for all configured currency pairs.
+        
+        Parameters:
+        -----------
+        save_features : bool
+            Whether to save features to CSV files
+        correlation_threshold : float
+            Threshold for removing correlated features
+            
+        Returns:
+        --------
+        Dict[str, pd.DataFrame]
+            Dictionary mapping currency pair to its features DataFrame
+        """
+        print("=" * 80)
+        print(f"=== Regime Detection Feature Engineering - All Currency Pairs ===")
+        print(f"Processing {len(self.currency_pairs)} currency pair(s): {', '.join(self.currency_pairs)}")
+        print("=" * 80)
+        
+        all_pair_features = {}
+        
+        for pair in self.currency_pairs:
+            print(f"\n{'=' * 80}")
+            try:
+                features = self.run_regime_detection_pipeline(
+                    fx_file_path=f"{pair}.csv",
+                    currency_pair=pair,
+                    save_features=save_features,
+                    output_file=f"regime_detection_features_{pair}.csv",
+                    correlation_threshold=correlation_threshold
+                )
+                all_pair_features[pair] = features
+                print(f"✅ Successfully processed {pair}")
+            except Exception as e:
+                print(f"❌ Error processing {pair}: {e}")
+                continue
+        
+        print(f"\n{'=' * 80}")
+        print(f"=== Processing Complete ===")
+        print(f"Successfully processed {len(all_pair_features)}/{len(self.currency_pairs)} currency pairs")
+        print("=" * 80)
+        
+        return all_pair_features
 
 
 def main():
     """Main function to run the regime detection feature engineering pipeline."""
     
-    # Initialize regime detection feature engineering class
+    # Initialize regime detection feature engineering class with multiple currency pairs
     feature_engineer = RegimeDetectionFeatureEngineering(
-        windows=[6, 12, 24]  # 6, 12, and 24 month windows
+        windows=[2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21],  # 6, 12, and 24 month windows
+        currency_pairs=["EURUSD", "USDJPY", "EURJPY", "AUDUSD", "XAUUSD", "GBPUSD"]  # Multiple currency pairs
     )
     
-    # Run the complete pipeline
+    # Run the complete pipeline for all currency pairs
     try:
-        features = feature_engineer.run_regime_detection_pipeline(
-            eurusd_file_path="EURUSD.csv",
+        all_features = feature_engineer.run_regime_detection_all_pairs(
             save_features=True,
-            output_file="regime_detection_features.csv",
             correlation_threshold=1.0
         )
 
-        
-        print("\n=== Summary Statistics ===")
-        print(features.describe())
-        
-        print(f"\n=== Sample Features (Last 5 rows) ===")
-        print(features.tail())
-        
-        print(f"\n=== Feature Categories ===")
-        feature_categories = {
-            'Base Price Features': [col for col in features.columns if col in ['EURUSD_Close', 'EURUSD_Return_1M', 'EURUSD_Return_3M', 'EURUSD_Return_6M', 'EURUSD_LogReturn'] or 'EURUSD_vs_MA' in col],
-            'Structural Breaks': [col for col in features.columns if any(x in col for x in ['cusum', 'level_shift', 'var_shift', 'regime_type', 'regime_duration', 'breakout'])],
-            'Cycle Detection': [col for col in features.columns if any(x in col for x in ['peak', 'trough', 'cycle_length', 'cycle_position', 'seasonal', 'quarterly', 'dominant_period'])],
-            'Market States': [col for col in features.columns if any(x in col for x in ['trend_slope', 'trend_r2', 'sideways', 'mean_reversion', 'momentum_persistence', 'market_regime'])],
-            'Volatility Regimes': [col for col in features.columns if any(x in col for x in ['vol_ratio', 'vol_regime', 'vol_transition', 'vol_autocorr', 'vol_surprise', 'extreme_vol'])],
-            'Cross-Timeframe': [col for col in features.columns if any(x in col for x in ['_corr_', '_rel_perf_', '_leader_regime_', '_divergence_', '_vol_spillover_'])]
-        }
-        
-        for category, feature_list in feature_categories.items():
-            print(f"  {category}: {len(feature_list)} features")
-        
-        print(f"\n=== Feature List ===")
-        for i, col in enumerate(features.columns, 1):
-            print(f"{i:2d}. {col}")
-        
-        # Final validation
-        print(f"\n=== Final Correlation Validation ===")
-        final_corr = features.corr().abs()
-        max_corr = 0
-        max_pair = None
-        
-        for i in range(len(final_corr.columns)):
-            for j in range(i+1, len(final_corr.columns)):
-                corr_val = final_corr.iloc[i, j]
-                if corr_val > max_corr:
-                    max_corr = corr_val
-                    max_pair = (final_corr.columns[i], final_corr.columns[j])
-        
-        print(f"Maximum correlation between final features: {max_corr:.3f}")
-        if max_pair:
-            print(f"  Between: {max_pair[0]} and {max_pair[1]}")
-        
-        if max_corr < 0.7:
-            print("✅ All features have correlation < 0.7")
-        else:
-            print("⚠️ Some features still have high correlation")
+        # Display summary for each pair
+        for pair, features in all_features.items():
+            print(f"\n=== Summary for {pair} ===")
+            print("\n=== Summary Statistics ===")
+            print(features.describe())
+            
+            print(f"\n=== Sample Features (Last 5 rows) ===")
+            print(features.tail())
+            
+            print(f"\n=== Feature Categories ===")
+            feature_categories = {
+                'Base Price Features': [col for col in features.columns if '_Close' in col or '_Return_' in col or '_vs_MA' in col],
+                'Structural Breaks': [col for col in features.columns if any(x in col for x in ['cusum', 'level_shift', 'var_shift', 'regime_type', 'regime_duration', 'breakout'])],
+                'Cycle Detection': [col for col in features.columns if any(x in col for x in ['peak', 'trough', 'cycle_length', 'cycle_position', 'seasonal', 'quarterly', 'dominant_period'])],
+                'Market States': [col for col in features.columns if any(x in col for x in ['trend_slope', 'trend_r2', 'sideways', 'mean_reversion', 'momentum_persistence', 'market_regime'])],
+                'Volatility Regimes': [col for col in features.columns if any(x in col for x in ['vol_ratio', 'vol_regime', 'vol_transition', 'vol_autocorr', 'vol_surprise', 'extreme_vol'])],
+                'Cross-Timeframe': [col for col in features.columns if any(x in col for x in ['_corr_', '_rel_perf_', '_leader_regime_', '_divergence_', '_vol_spillover_'])]
+            }
+            
+            for category, feature_list in feature_categories.items():
+                print(f"  {category}: {len(feature_list)} features")
+            
+            print(f"\n=== Feature List ===")
+            for i, col in enumerate(features.columns, 1):
+                print(f"{i:2d}. {col}")
+            
+            # Final validation
+            print(f"\n=== Final Correlation Validation ===")
+            final_corr = features.corr().abs()
+            max_corr = 0
+            max_pair = None
+            
+            for i in range(len(final_corr.columns)):
+                for j in range(i+1, len(final_corr.columns)):
+                    corr_val = final_corr.iloc[i, j]
+                    if corr_val > max_corr:
+                        max_corr = corr_val
+                        max_pair = (final_corr.columns[i], final_corr.columns[j])
+            
+            print(f"Maximum correlation between final features: {max_corr:.3f}")
+            if max_pair:
+                print(f"  Between: {max_pair[0]} and {max_pair[1]}")
+            
+            if max_corr < 0.7:
+                print("✅ All features have correlation < 0.7")
+            else:
+                print("⚠️ Some features still have high correlation")
         
     except Exception as e:
         print(f"Error in regime detection pipeline: {e}")

@@ -2,6 +2,7 @@
 *.txt
 .idea
 *.log
+*.html
 
 # Python cache files
 __pycache__/
