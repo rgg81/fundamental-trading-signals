@@ -1,118 +1,196 @@
 import pandas as pd
 import numpy as np
+import random
 import optuna
 from xgboost import XGBClassifier
 from sklearn.model_selection import TimeSeriesSplit
 from sklearn.metrics import accuracy_score, classification_report
 from strategy import Strategy
+from functools import partial
 
 class XGBoostOptunaStrategy(Strategy):
-    def __init__(self, n_trials=15, n_splits=5, random_state=42):
+    """XGBoost strategy with Optuna hyperparameter optimization"""
+    
+    def __init__(self, n_trials=50, n_splits=6, feature_set="macro_", feature_frequency="_18", symbol="EURUSD"):
+        # Initialize base class with step_size=6
+        super().__init__(
+            symbol=symbol,
+            step_size=6,
+            feature_set=feature_set,
+            feature_frequency=feature_frequency
+        )
+        
         self.n_trials = n_trials
         self.n_splits = n_splits
-        self.random_state = random_state
-        self.model = None
+        self.models = []
+        self.features_per_model = []
         self.best_params = None
-        self.fitted = False
-
 
     def fit(self, X, y):
-        # Clean data to handle infinities
-        
-        def objective(trial):
+
+        def objective(trial, InputFeatures, y_label, seed_random):
             # Calculate class balance ratio
-            negative_count = (y == 0).sum()
-            positive_count = (y == 1).sum()
+            negative_count = (y_label == 0).sum()
+            positive_count = (y_label == 1).sum()
             scale_pos_weight = negative_count / positive_count if positive_count > 0 else 1.0
             
-            # Define the hyperparameter search space for XGBoost
             params = {
-                'n_estimators': trial.suggest_int('n_estimators', 10, 50, log=True),
-                'learning_rate': trial.suggest_float('learning_rate', 0.1, 0.3, log=True),
+                'n_estimators': trial.suggest_int('n_estimators', 50, 100),
+                'learning_rate': trial.suggest_float('learning_rate', 0.1, 0.3),
                 'max_depth': trial.suggest_int('max_depth', 4, 5),
-                # different boosting types for xgboost
-                'booster': trial.suggest_categorical('booster', ['gbtree', 'gblinear', 'dart']),
-                # Handle class imbalance
+                'booster': trial.suggest_categorical('booster', ['gbtree']),
                 'scale_pos_weight': scale_pos_weight,
-               # 'min_child_weight': trial.suggest_int('min_child_weight', 1, 30),
-               # 'subsample': trial.suggest_float('subsample', 0.9, 1.0),
-               # 'colsample_bytree': trial.suggest_float('colsample_bytree', 0.1, 1.0),
-              #  'gamma': trial.suggest_float('gamma', 0.1, 10, log=True),
-               # 'reg_alpha': trial.suggest_float('reg_alpha', 0.1, 10, log=True),
-               # 'reg_lambda': trial.suggest_float('reg_lambda', 1, 10, log=True),
-               # 'random_state': self.random_state,
-             #   'use_label_encoder': False,  # Prevents warning about label encoder
-              #  'eval_metric': 'logloss'  # Required for newer versions of XGBoost
+                'random_state': seed_random,
+                'use_label_encoder': False,
+                'eval_metric': 'logloss'
             }
             
-            tscv = TimeSeriesSplit(n_splits=self.n_splits)
+            # TimeSeriesSplit parameters (matching LGBM)
+            max_train_size = trial.suggest_int('max_train_size', 30, 120)
+            gap = trial.suggest_int('gap', 0, 10)
+            
+            tscv = TimeSeriesSplit(
+                n_splits=self.n_splits,
+                max_train_size=max_train_size,
+                test_size=self.step_size,
+                gap=gap
+            )
             scores = []
-            for train_idx, val_idx in tscv.split(X):
-                X_train, X_val = X.iloc[train_idx], X.iloc[val_idx]
-                y_train, y_val = y.iloc[train_idx], y.iloc[val_idx]
+            splits = list(tscv.split(InputFeatures))
+            
+            # Train on all splits except the last one
+            for train_idx, val_idx in splits[:-1]:
+                X_train, X_val = InputFeatures.iloc[train_idx], InputFeatures.iloc[val_idx]
+                y_train, y_val = y_label.iloc[train_idx], y_label.iloc[val_idx]
+                xgb = XGBClassifier(**params)
+                xgb.fit(X_train, y_train, eval_set=[(X_val, y_val)], verbose=False)
                 
-                try:
-                    xgb = XGBClassifier(**params)
-                    xgb.fit(X_train, y_train)
-                    preds = xgb.predict(X_val)
-                    scores.append(accuracy_score(y_val, preds))
-                except Exception as e:
-                    print(f"Error in XGBoost training: {e}")
-                    return 0.0  # Return worst score for failed trials
-                    
-            return 1.0 - np.mean(scores)  # minimize error
+                preds = xgb.predict(X_val)
+                scores.append(accuracy_score(y_val, preds))
+            
+            # Final validation on last split
+            for train_idx, val_idx in splits[-1:]:
+                X_train, X_val = InputFeatures.iloc[train_idx], InputFeatures.iloc[val_idx]
+                y_train, y_val = y_label.iloc[train_idx], y_label.iloc[val_idx]
+                xgb = XGBClassifier(**params)
+                xgb.fit(X_train, y_train, verbose=False)
+                preds = xgb.predict(X_val)
+                print(f"\n Trial number: {trial.number} Validation classification report:\n", 
+                      classification_report(y_val, preds), flush=True)
+            
+            print(f"\n Trial number: {trial.number} Scores: {scores}\n", flush=True)
+            mean_score = np.mean(scores)
+            
+            return 1 - mean_score
+        
+        seed_random = random.randint(1, 100000)
+        random.seed(seed_random)
+        np.random.seed(seed_random)
+        X_train = X
+        y_train = y
+        X_selected = X_train
+        columns_to_drop = ['Label', 'Date', f'{self.symbol}_Close']
+        X_selected = X_selected.drop(columns=columns_to_drop)
 
-        study = optuna.create_study(direction='minimize')
-        study.optimize(objective, n_trials=self.n_trials)
+        objective_func = partial(objective, InputFeatures=X_selected, y_label=y_train, seed_random=seed_random)
+        study = optuna.create_study(direction='minimize', sampler=optuna.samplers.TPESampler(seed=seed_random))
+        study.optimize(objective_func, n_trials=self.n_trials)
+        best_trial = study.best_trial
+        best_params = best_trial.params
         
-        self.best_params = study.best_params
-        print(f"Best XGBoost parameters: {self.best_params}")
+        # Calculate class balance for final model
+        negative_count = (y_train == 0).sum()
+        positive_count = (y_train == 1).sum()
+        scale_pos_weight = negative_count / positive_count if positive_count > 0 else 1.0
         
-        # Train the final model with best parameters
-        self.model = XGBClassifier(**self.best_params)
-        self.model.fit(X, y)
+        best_params.update({
+            'scale_pos_weight': scale_pos_weight,
+            'random_state': seed_random,
+            'use_label_encoder': False,
+            'eval_metric': 'logloss'
+        })
+        max_train_size = best_params.pop('max_train_size')
+        gap = best_params.pop('gap')
+
+        tscv = TimeSeriesSplit(
+            n_splits=self.n_splits,
+            max_train_size=max_train_size,
+            test_size=self.step_size,
+            gap=gap
+        )
+        splits = list(tscv.split(X_selected))
+
+        for train_idx, val_idx in splits[-1:]:
+            X_train, X_val = X_selected.iloc[train_idx], X_selected.iloc[val_idx]
+            y_train, y_val = y.iloc[train_idx], y.iloc[val_idx]
+            xgb = XGBClassifier(**best_params)
+            xgb.fit(X_train, y_train, verbose=False)
+            preds = xgb.predict(X_val)
+            self.models.append(xgb)
+            self.features_per_model.append(X_train.columns.tolist())
+            print(f"\n Feature Best Selection Trial number: {best_trial.number} Classification report predictions:\n", 
+                  classification_report(y_val, preds), flush=True)
         self.fitted = True
-        
-        # Evaluate on training data
-        preds = self.model.predict(X)
-        print("Classification Report:\n", classification_report(y, preds))
-
-        # Feature importance for XGBoost
-        feature_importance = pd.DataFrame({
-            'Feature': X.columns,
-            'Importance': self.model.feature_importances_
-        }).sort_values('Importance', ascending=False)
-        
-        print("\nTop 10 most important features:")
-        print(feature_importance.head(10))
         
 
     def generate_signal(self, past_data, current_data):
-        # Remove inf data
-        past_data = past_data.replace([np.inf, -np.inf], np.nan).dropna()
-        current_data = current_data.replace([np.inf, -np.inf], np.nan).dropna()
-
-        if current_data.empty:
-            return None, 10
+        # Use base class feature filtering
+        past_data_filtered = self._filter_features(past_data)
+        current_data_filtered = self._filter_features(current_data)
         
-        columns_to_drop = ['Label', 'Date', 'EURUSD_Close']
-        X = past_data.drop(columns=columns_to_drop)
-        # y only Label
-        y = past_data['Label']
+        # No data cleaning needed - XGBoost handles NaN/inf natively
+        columns_to_drop = ['Label', 'Date', f'{self.symbol}_Close']
+        X = past_data_filtered
+        y = past_data_filtered['Label']
         
-        # Fit model
-        # Reset the model every time we call generate_signal
-        self.model = None
+        # Reset and retrain
+        self.models = []
+        self.features_per_model = []
         self.fit(X, y)
         
         # X_pred should be the same features as X
-        X_pred = current_data.drop(columns=columns_to_drop)
+        X_preds = current_data_filtered.drop(columns=columns_to_drop)
+        preds = []
+        amounts = []
         
-        # Predict
-        pred = self.model.predict(X_pred)[0]
+        # Generate predictions for each row
+        for _, X_pred in X_preds.iterrows():
+            votes = []
+            
+            # Each model gets only its relevant features
+            for i, model in enumerate(self.models):
+                # Get the features this specific model was trained on
+                model_features = self.features_per_model[i]
+                
+                # Select only those features from X_pred
+                X_pred_filtered = X_pred[model_features]
+                
+                # Make prediction with the filtered features
+                vote = model.predict([X_pred_filtered])[0]
+                votes.append(vote)
+            
+            print(f"Individual model votes: {votes}", flush=True)
+            
+            # Weighted voting (identical to LGBM logic)
+            total_weight = 0
+            weighted_signal_sum = 0
+            for vote in votes:
+                if vote == 1:
+                    total_weight += 10
+                    weighted_signal_sum += 10
+                else:
+                    total_weight += 10
+                    weighted_signal_sum -= 10
+
+            normalized_signal = weighted_signal_sum / total_weight
+            
+            # Calculate final prediction and amount
+            if normalized_signal > 0:
+                pred = 1
+            else:
+                pred = 0
+            
+            preds.append(pred)
+            amounts.append(int(round(min(abs(normalized_signal) * 10, 10))))
         
-        # Get prediction probabilities
-        pred_probs = self.model.predict_proba(X_pred)[0]
-        print(f"Prediction probabilities: Class 0: {pred_probs[0]:.4f}, Class 1: {pred_probs[1]:.4f}")
-        
-        return int(pred), 10  # signal, amount
+        return preds, amounts

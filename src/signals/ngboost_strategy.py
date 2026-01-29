@@ -1,3 +1,4 @@
+import random
 import pandas as pd
 import numpy as np
 import optuna
@@ -9,105 +10,58 @@ from sklearn.tree import DecisionTreeRegressor
 from sklearn.model_selection import TimeSeriesSplit
 from sklearn.metrics import accuracy_score, classification_report
 from strategy import Strategy
+from functools import partial
 
 class NGBoostOptunaStrategy(Strategy):
-    def __init__(self, n_trials=10, n_splits=5, random_state=42):
+    """NGBoost strategy with Optuna hyperparameter optimization"""
+    
+    def __init__(self, n_trials=50, n_splits=6, feature_set="macro_", feature_frequency="_18", symbol="EURUSD"):
+        # Initialize base class with step_size=6
+        super().__init__(
+            symbol=symbol,
+            step_size=6,
+            feature_set=feature_set,
+            feature_frequency=feature_frequency
+        )
+        
         self.n_trials = n_trials
         self.n_splits = n_splits
-        self.random_state = random_state
-        self.model = None
+        self.models = []
+        self.features_per_model = []
         self.best_params = None
-        self.fitted = False
-
-    def _clean_data(self, df):
-        """Clean data by removing rows with NaN or infinity values"""
-        # Make a copy to avoid modifying the original data
-        df_clean = df.copy()
-        
-        # Remove rows with infinity values
-        df_clean = df_clean[~df_clean.isin([np.inf, -np.inf]).any(axis=1)]
-        
-        # Remove rows with NaN values
-        df_clean = df_clean.dropna()
-        
-        return df_clean
-    
-    def _validate_data(self, X, y):
-        """Validate data for NGBoost training"""
-        # Check if we have enough samples
-        if len(X) < 20:
-            raise ValueError(f"Insufficient data: {len(X)} samples, need at least 20")
-        
-        # Check if we have both classes
-        unique_classes = np.unique(y)
-        if len(unique_classes) < 2:
-            raise ValueError(f"Need both classes for classification, found: {unique_classes}")
-        
-        # Check class balance - if too imbalanced, it might cause issues
-        class_counts = np.bincount(y)
-        minority_ratio = min(class_counts) / len(y)
-        if minority_ratio < 0.05:  # Less than 5% minority class
-            print(f"Warning: Imbalanced classes detected. Minority class ratio: {minority_ratio:.3f}")
-        
-        # Check for constant features
-        feature_vars = np.var(X, axis=0)
-        zero_var_features = np.sum(feature_vars == 0)
-        if zero_var_features > 0:
-            print(f"Warning: {zero_var_features} constant features detected")
-        
-        return True
 
     def fit(self, X, y):
-        # Clean data to handle infinities
-        X_clean = self._clean_data(X)
-        
-        # Validate data before proceeding
-        try:
-            self._validate_data(X_clean.values, y.values)
-        except ValueError as e:
-            print(f"Data validation failed: {e}")
-            # Create a simple fallback model
-            from sklearn.linear_model import LogisticRegression
-            self.model = LogisticRegression()
-            self.model.fit(X_clean, y)
-            self.fitted = True
-            self.best_params = {"fallback": "LogisticRegression"}
-            print("Using LogisticRegression fallback due to data issues")
-            return
-        
-        def objective(trial):
-            # Define the hyperparameter search space for NGBoost
+
+        def objective(trial, InputFeatures, y_label, seed_random):
+            # Simplified hyperparameter search space for NGBoost
             params = {
-                'n_estimators': trial.suggest_int('n_estimators', 5, 100),  # Reduced range
-                'learning_rate': trial.suggest_float('learning_rate', 0.001, 0.3, log=True),  # Reduced range
-               # 'minibatch_frac': trial.suggest_float('minibatch_frac', 0.8, 1.0),  # Higher minibatch
-                'col_sample': trial.suggest_float('col_sample', 0.9, 1.0),  # Higher col_sample
-                #'tol': trial.suggest_float('tol', 1e-4, 1e-2, log=True),  # More lenient tolerance
-                #'random_state': self.random_state,
-                'verbose': False
+                'n_estimators': trial.suggest_int('n_estimators', 50, 100),
+                'learning_rate': trial.suggest_float('learning_rate', 0.01, 0.1, log=True),
+                'verbose': False,
+                'random_state': seed_random
             }
             
-            # Tree-specific parameters - more conservative
+            # Simple tree-specific parameters - more conservative to avoid singular matrix
             tree_params = {
-                #'criterion': trial.suggest_categorical('criterion', ['friedman_mse']),  # More stable
-                #'min_samples_split': trial.suggest_int('min_samples_split', 5, 20),  # Higher minimum
-                #'min_samples_leaf': trial.suggest_int('min_samples_leaf', 3, 10),  # Higher minimum
-                #'min_weight_fraction_leaf': trial.suggest_float('min_weight_fraction_leaf', 0.0, 0.1),  # Lower max
-                'max_depth': trial.suggest_int('max_depth', 1, 2),  # Shallower trees
-                'max_features': trial.suggest_categorical('max_features', [None])  # Remove None
+                'max_depth': trial.suggest_int('max_depth', 2, 3),
+                'min_samples_split': 10,
+                'min_samples_leaf': 5,
+                'random_state': seed_random
             }
             
-            tscv = TimeSeriesSplit(n_splits=self.n_splits)
+            # Optimize max_train_size and gap
+            max_train_size = trial.suggest_int('max_train_size', 30, 120)
+            gap = trial.suggest_int('gap', 0, 10)
+            
+            tscv = TimeSeriesSplit(n_splits=self.n_splits, max_train_size=max_train_size, test_size=self.step_size, gap=gap)
             scores = []
-            for train_idx, val_idx in tscv.split(X_clean):
-                X_train, X_val = X_clean.iloc[train_idx], X_clean.iloc[val_idx]
-                y_train, y_val = y.iloc[train_idx], y.iloc[val_idx]
+            splits = list(tscv.split(InputFeatures))
+            
+            for train_idx, val_idx in splits[:-1]:
+                X_train, X_val = InputFeatures.iloc[train_idx], InputFeatures.iloc[val_idx]
+                y_train, y_val = y_label.iloc[train_idx], y_label.iloc[val_idx]
                 
                 try:
-                    # Additional validation for each fold
-                    if len(np.unique(y_train)) < 2 or len(np.unique(y_val)) < 2:
-                        continue  # Skip this fold if missing classes
-                    
                     # Create base learner with tree parameters
                     base_learner = DecisionTreeRegressor(**tree_params)
                     
@@ -119,134 +73,162 @@ class NGBoostOptunaStrategy(Strategy):
                         **params
                     )
                     
-                    # Convert to numpy arrays (NGBoost prefers numpy)
-                    X_train_np = X_train.values
-                    X_val_np = X_val.values
-                    y_train_np = y_train.values
-                    y_val_np = y_val.values
-                    
-                    # Fit the model with error handling
-                    ngb.fit(X_train_np, y_train_np, 
-                           X_val=X_val_np, Y_val=y_val_np,
-                           early_stopping_rounds=30)  # Reduced from 50
+                    # Fit the model without validation to avoid singular matrix issues
+                    ngb.fit(X_train.values, y_train.values)
                     
                     # Make predictions
-                    preds = ngb.predict(X_val_np)
-                    scores.append(accuracy_score(y_val_np, preds))
+                    preds = ngb.predict(X_val.values)
+                    scores.append(accuracy_score(y_val, preds))
                     
                 except Exception as e:
-                    print(f"Error in NGBoost training fold: {e}")
-                    continue  # Skip this fold instead of failing entirely
+                    print(f"Error in NGBoost training fold: {e}", flush=True)
+                    continue
                     
-            if not scores:  # No successful folds
-                return 1.0  # Return worst score
+            # Evaluate on last split
+            for train_idx, val_idx in splits[-1:]:
+                X_train, X_val = InputFeatures.iloc[train_idx], InputFeatures.iloc[val_idx]
+                y_train, y_val = y_label.iloc[train_idx], y_label.iloc[val_idx]
                 
-            return 1.0 - np.mean(scores)  # minimize error
+                try:
+                    base_learner = DecisionTreeRegressor(**tree_params)
+                    ngb = NGBoost(
+                        Base=base_learner,
+                        Dist=Bernoulli,
+                        Score=LogScore,
+                        **params
+                    )
+                    ngb.fit(X_train.values, y_train.values)
+                    preds = ngb.predict(X_val.values)
+                    print(f"\n Trial number: {trial.number} Validation classification report:\n", classification_report(y_val, preds), flush=True)
+                except Exception as e:
+                    print(f"Error in final fold: {e}", flush=True)
+                    
+            if not scores:
+                return 1.0
+                
+            print(f"\n Trial number: {trial.number} Scores:{scores}\n", flush=True)
+            mean_score = np.mean(scores)
+            return 1.0 - mean_score
+        
+        seed_random = random.randint(1, 100000)
+        random.seed(seed_random)
+        np.random.seed(seed_random)
+        
+        X_train = X
+        y_train = y
+        X_selected = X_train
+        columns_to_drop = ['Label', 'Date', f'{self.symbol}_Close']
+        X_selected = X_selected.drop(columns=columns_to_drop)
 
-        study = optuna.create_study(direction='minimize')
-        study.optimize(objective, n_trials=self.n_trials)
+        objective_func = partial(objective, InputFeatures=X_selected, y_label=y_train, seed_random=seed_random)
+        study = optuna.create_study(direction='minimize', sampler=optuna.samplers.TPESampler(seed=seed_random))
+        study.optimize(objective_func, n_trials=self.n_trials)
         
-        self.best_params = study.best_params
-        print(f"Best NGBoost parameters: {self.best_params}")
+        best_trial = study.best_trial
+        best_params = best_trial.params
         
-        # Extract tree parameters from best_params
+        # Extract parameters
         tree_params = {
-            'criterion': self.best_params.get('criterion', 'friedman_mse'),
-            'min_samples_split': self.best_params.get('min_samples_split', 5),
-            'min_samples_leaf': self.best_params.get('min_samples_leaf', 3),
-            'min_weight_fraction_leaf': self.best_params.get('min_weight_fraction_leaf', 0.0),
-            'max_depth': self.best_params.get('max_depth', 3),
-            'max_features': self.best_params.get('max_features', 'sqrt')
+            'max_depth': best_params.pop('max_depth'),
+            'min_samples_split': 10,
+            'min_samples_leaf': 5,
+            'random_state': seed_random
         }
         
-        # Extract NGBoost parameters
-        ngb_params = {k: v for k, v in self.best_params.items() if k not in tree_params}
+        ngb_params = {
+            'n_estimators': best_params.pop('n_estimators'),
+            'learning_rate': best_params.pop('learning_rate'),
+            'verbose': False,
+            'random_state': seed_random
+        }
         
-        # Train the final model with best parameters and error handling
-        try:
-            base_learner = DecisionTreeRegressor(**tree_params)
-            self.model = NGBoost(
-                Base=base_learner,
-                Dist=Bernoulli,
-                Score=LogScore,
-                **ngb_params
-            )
-            
-            # Convert to numpy arrays
-            X_clean_np = X_clean.values
-            y_np = y.values
-            
-            self.model.fit(X_clean_np, y_np)
-            self.fitted = True
-            
-            # Evaluate on training data
-            preds = self.model.predict(X_clean_np)
-            print("Classification Report:\n", classification_report(y_np, preds))
-            
-        except Exception as e:
-            print(f"Error in final NGBoost training: {e}")
-            print("Falling back to LogisticRegression")
-            # Fallback to a simple model
-            from sklearn.linear_model import LogisticRegression
-            self.model = LogisticRegression(random_state=self.random_state)
-            self.model.fit(X_clean, y)
-            self.fitted = True
-            self.best_params = {"fallback": "LogisticRegression"}
+        max_train_size = best_params.pop('max_train_size')
+        gap = best_params.pop('gap')
 
+        tscv = TimeSeriesSplit(n_splits=self.n_splits, max_train_size=max_train_size, test_size=self.step_size, gap=gap)
+        splits = list(tscv.split(X_selected))
 
+        for train_idx, val_idx in splits[-1:]:
+            X_train, X_val = X_selected.iloc[train_idx], X_selected.iloc[val_idx]
+            y_train_split, y_val = y.iloc[train_idx], y.iloc[val_idx]
+            
+            try:
+                base_learner = DecisionTreeRegressor(**tree_params)
+                ngb = NGBoost(
+                    Base=base_learner,
+                    Dist=Bernoulli,
+                    Score=LogScore,
+                    **ngb_params
+                )
+                ngb.fit(X_train.values, y_train_split.values)
+                preds = ngb.predict(X_val.values)
+                self.models.append(ngb)
+                self.features_per_model.append(X_train.columns.tolist())
+                print(f"\n Feature Best Selection Trial number: {best_trial.number} Classification report predictions:\n", classification_report(y_val, preds), flush=True)
+            except Exception as e:
+                print(f"Error training final model: {e}", flush=True)
+                
+        self.fitted = True
     def generate_signal(self, past_data, current_data):
-        # Clean input data
-        past_data = self._clean_data(past_data)
-        current_data = self._clean_data(current_data)
-
-        if current_data.empty:
-            return None, 10
+        # Use base class feature filtering
+        past_data_filtered = self._filter_features(past_data)
+        current_data_filtered = self._filter_features(current_data)
         
-        columns_to_drop = ['Label', 'Date', 'EURUSD_Close']
-        X = past_data.drop(columns=columns_to_drop)
-        # y only Label
-        y = past_data['Label']
+        columns_to_drop = ['Label', 'Date', f'{self.symbol}_Close']
+        X = past_data_filtered
+        y = past_data_filtered['Label']
         
-        # Fit model
-        # Reset the model every time we call generate_signal
-        self.model = None
+        # Reset and retrain
+        self.models = []
+        self.features_per_model = []
         self.fit(X, y)
         
         # X_pred should be the same features as X
-        X_pred = current_data.drop(columns=columns_to_drop)
+        X_preds = current_data_filtered.drop(columns=columns_to_drop)
+        preds = []
+        amounts = []
         
-        # Clean prediction data
-        X_pred_clean = self._clean_data(X_pred)
+        # Iterate over all predictions
+        for _, X_pred in X_preds.iterrows():
+            votes = []
         
-        # Convert to numpy array
-        X_pred_np = X_pred_clean.values
-        
-        # Predict with error handling
-        try:
-            pred = self.model.predict(X_pred_np)[0]
-            
-            # Handle different model types
-            if hasattr(self.model, 'predict_proba'):
-                # LogisticRegression fallback
-                pred_probs = self.model.predict_proba(X_pred_np)[0]
-                prob_class_0 = pred_probs[0]
-                prob_class_1 = pred_probs[1]
-                pred_uncertainty = min(prob_class_0, prob_class_1)  # Uncertainty is min probability
+            # Each model gets only its relevant features
+            for i, model in enumerate(self.models):
+                # Get the features this specific model was trained on
+                model_features = self.features_per_model[i]
                 
-                print(f"Prediction probabilities: Class 0: {prob_class_0:.4f}, Class 1: {prob_class_1:.4f}")
-                print(f"Prediction uncertainty: {pred_uncertainty:.4f}")
+                # Select only those features from X_pred
+                X_pred_filtered = X_pred[model_features]
                 
-                if pred_uncertainty > 0.4:  # High uncertainty for logistic regression
-                    print("High uncertainty detected - consider reducing position size")
+                # Make prediction with the filtered features
+                try:
+                    vote = model.predict(X_pred_filtered.values.reshape(1, -1))[0]
+                    votes.append(vote)
+                except Exception as e:
+                    print(f"Error in model prediction: {e}", flush=True)
+                    continue
                     
+            print(f"Individual model votes: {votes}", flush=True)
+            
+            # Calculate weighted signal
+            total_weight = 0
+            weighted_signal_sum = 0
+            for vote in votes:
+                if vote == 1:
+                    total_weight += 10
+                    weighted_signal_sum += 10
+                else:
+                    total_weight += 10
+                    weighted_signal_sum -= 10
+
+            normalized_signal = weighted_signal_sum / total_weight if total_weight > 0 else 0
+            
+            # Calculate the final prediction and amount
+            if normalized_signal > 0:
+                pred = 1
             else:
-                # NGBoost model
-                print(f"NGBoost prediction: {pred}")
-                
-        except Exception as e:
-            print(f"Error in prediction: {e}")
-            # Return random prediction as fallback
-            pred = np.random.randint(0, 2)
-            print(f"Using random fallback prediction: {pred}")
-        
-        return int(pred), 10  # signal, amount
+                pred = 0
+            preds.append(pred)
+            amounts.append(int(round(min(abs(normalized_signal) * 10, 10))))
+            
+        return preds, amounts

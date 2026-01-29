@@ -1,3 +1,4 @@
+import random
 import pandas as pd
 import numpy as np
 import optuna
@@ -5,15 +6,25 @@ from sklearn.svm import SVC
 from sklearn.model_selection import TimeSeriesSplit
 from sklearn.metrics import accuracy_score, classification_report
 from strategy import Strategy
+from functools import partial
 
 class SVCOptunaStrategy(Strategy):
-    def __init__(self, n_trials=10, n_splits=5, random_state=42):
+    """SVC strategy with Optuna hyperparameter optimization"""
+    
+    def __init__(self, n_trials=10, n_splits=6, feature_set="macro_", feature_frequency="_18", symbol="EURUSD"):
+        # Initialize base class with step_size=6
+        super().__init__(
+            symbol=symbol,
+            step_size=6,
+            feature_set=feature_set,
+            feature_frequency=feature_frequency
+        )
+        
         self.n_trials = n_trials
         self.n_splits = n_splits
-        self.random_state = random_state
-        self.model = None
+        self.models = []
+        self.features_per_model = []
         self.best_params = None
-        self.fitted = False
 
     def _clean_data(self, df):
         """Clean data by removing rows with NaN or infinity values"""
@@ -29,26 +40,31 @@ class SVCOptunaStrategy(Strategy):
         return df_clean
 
     def fit(self, X, y):
-        # Clean data to handle infinities
-        X_clean = X
-        
-        def objective(trial):
-            # Define the hyperparameter search space for SVC
+
+        def objective(trial, InputFeatures, y_label, seed_random):
+            # Define the hyperparameter search space for SVC (simplified for speed)
             params = {
-              #  'C': trial.suggest_float('C', 0.1, 100.0, log=True),
-                'kernel': trial.suggest_categorical('kernel', ['linear', 'poly', 'rbf', 'sigmoid']),
-              #  'degree': trial.suggest_int('degree', 2, 5),  # only used by poly kernel
-              #  'gamma': trial.suggest_categorical('gamma', ['scale', 'auto']),
+                'C': trial.suggest_float('C', 0.1, 10.0, log=True),
+                'kernel': trial.suggest_categorical('kernel', ['linear', 'rbf']),
+                'gamma': 'scale',  # Fixed to 'scale' for stability
                 'class_weight': trial.suggest_categorical('class_weight', ['balanced', None]),
-              #  'probability': True,  # Enable probability estimates
-              #  'random_state': self.random_state
+                'random_state': seed_random,
             }
             
-            tscv = TimeSeriesSplit(n_splits=self.n_splits)
+            # Optimize max_train_size and gap with narrower ranges
+            max_train_size = trial.suggest_int('max_train_size', 40, 80)
+            gap = trial.suggest_int('gap', 0, 5)
+            
+            # Clean data to handle infinities
+            InputFeatures_clean = self._clean_data(InputFeatures)
+            y_label_clean = y_label.loc[InputFeatures_clean.index]
+
+            tscv = TimeSeriesSplit(n_splits=self.n_splits, max_train_size=max_train_size, test_size=self.step_size, gap=gap)
             scores = []
-            for train_idx, val_idx in tscv.split(X_clean):
-                X_train, X_val = X_clean.iloc[train_idx], X_clean.iloc[val_idx]
-                y_train, y_val = y.iloc[train_idx], y.iloc[val_idx]
+            splits = list(tscv.split(InputFeatures_clean))
+            for train_idx, val_idx in splits[:-1]:  # only the last 3 splits to save time
+                X_train, X_val = InputFeatures_clean.iloc[train_idx], InputFeatures_clean.iloc[val_idx]
+                y_train, y_val = y_label_clean.iloc[train_idx], y_label_clean.iloc[val_idx]
                 
                 try:
                     svc = SVC(**params)
@@ -57,72 +73,125 @@ class SVCOptunaStrategy(Strategy):
                     scores.append(accuracy_score(y_val, preds))
                 except Exception as e:
                     print(f"Error in SVC training: {e}")
-                    return 0.0  # Return worst score for failed trials
-                    
-            return 1.0 - np.mean(scores)  # minimize error
-
-        study = optuna.create_study(direction='minimize')
-        study.optimize(objective, n_trials=self.n_trials)
-        
-        self.best_params = study.best_params
-        print(f"Best SVC parameters: {self.best_params}")
-        
-        # Train the final model with best parameters
-        self.model = SVC(**self.best_params)
-        self.model.fit(X_clean, y)
-        self.fitted = True
-        
-        # Evaluate on training data
-        preds = self.model.predict(X_clean)
-        print("Classification Report:\n", classification_report(y, preds))
-
-        # SVC doesn't have built-in feature importance, but we can analyze support vectors
-        print(f"\nNumber of support vectors: {self.model.n_support_}")
-        
-        # For linear kernels, we can extract coefficients as a measure of feature importance
-        if self.best_params['kernel'] == 'linear':
-            feature_importance = pd.DataFrame({
-                'Feature': X_clean.columns,
-                'Importance': np.abs(self.model.coef_[0])
-            }).sort_values('Importance', ascending=False)
+                    return 1.0  # Return worst score for failed trials
             
-            print("\nTop 10 most important features (for linear kernel):")
-            print(feature_importance.head(10))
+            # Last split for reporting
+            for train_idx, val_idx in splits[-1:]:
+                X_train, X_val = InputFeatures_clean.iloc[train_idx], InputFeatures_clean.iloc[val_idx]
+                y_train, y_val = y_label_clean.iloc[train_idx], y_label_clean.iloc[val_idx]
+                svc = SVC(**params)
+                svc.fit(X_train, y_train)
+                preds = svc.predict(X_val)
+                print(f"\n Trial number: {trial.number} Validation classification report:\n", classification_report(y_val, preds), flush=True)
+            
+            print(f"\n Trial number: {trial.number} Scores:{scores}\n", flush=True)
+            mean_score = np.mean(scores)
+            
+            return 1 - mean_score
+        
+        seed_random = random.randint(1, 100000)
+        random.seed(seed_random)
+        np.random.seed(seed_random)
+        X_train = X
+        y_train = y
+        X_selected = X_train
+        columns_to_drop = ['Label', 'Date', f'{self.symbol}_Close']
+        X_selected = X_selected.drop(columns=columns_to_drop)
+
+        objective_func = partial(objective, InputFeatures=X_selected, y_label=y_train, seed_random=seed_random)
+        study = optuna.create_study(direction='minimize', sampler=optuna.samplers.TPESampler(seed=seed_random))
+        study.optimize(objective_func, n_trials=self.n_trials)
+        best_trial = study.best_trial
+        best_params = best_trial.params
+        best_params.update({
+            'random_state': seed_random,
+        })
+        max_train_size = best_params.pop('max_train_size')
+        gap = best_params.pop('gap')
+
+        # Clean data before final training
+        X_selected_clean = self._clean_data(X_selected)
+        y_clean = y.loc[X_selected_clean.index]
+
+        tscv = TimeSeriesSplit(n_splits=self.n_splits, max_train_size=max_train_size, test_size=self.step_size, gap=gap)
+        splits = list(tscv.split(X_selected_clean))
+
+        for train_idx, val_idx in splits[-1:]:  # only the last split
+            X_train, X_val = X_selected_clean.iloc[train_idx], X_selected_clean.iloc[val_idx]
+            y_train, y_val = y_clean.iloc[train_idx], y_clean.iloc[val_idx]
+            svc = SVC(**best_params)
+            svc.fit(X_train, y_train)
+            preds = svc.predict(X_val)
+            self.models.append(svc)
+            self.features_per_model.append(X_train.columns.tolist())
+            print(f"\n Feature Best Selection Trial number: {best_trial.number} Classification report predictions:\n", classification_report(y_val, preds), flush=True)
+            
+            # SVC feature analysis
+            print(f"\nNumber of support vectors: {svc.n_support_}")
+            if best_params['kernel'] == 'linear':
+                feature_importance = pd.DataFrame({
+                    'Feature': X_train.columns,
+                    'Importance': np.abs(svc.coef_[0])
+                }).sort_values('Importance', ascending=False)
+                print("\nTop 10 most important features (for linear kernel):")
+                print(feature_importance.head(10))
+        
+        self.fitted = True
 
     def generate_signal(self, past_data, current_data):
-        # X all data frame less Label, Date and Close
-        past_data = self._clean_data(past_data)
-        current_data = self._clean_data(current_data)
-
-        if current_data.empty:
-            return None, 10
+        # Use base class feature filtering
+        past_data_filtered = self._filter_features(past_data)
+        current_data_filtered = self._filter_features(current_data)
         
-        columns_to_drop = ['Label', 'Date', 'EURUSD_Close']
-        X = past_data.drop(columns=columns_to_drop)
-        # y only Label
-        y = past_data['Label']
-        
-        # Fit model
-        # Reset the model every time we call generate_signal
-        self.model = None
+        columns_to_drop = ['Label', 'Date', f'{self.symbol}_Close']
+        X = past_data_filtered
+        y = past_data_filtered['Label']
+        # Reset and retrain
+        self.models = []
+        self.features_per_model = []
         self.fit(X, y)
-        
         # X_pred should be the same features as X
-        X_pred = current_data.drop(columns=columns_to_drop)
+        X_preds = current_data_filtered.drop(columns=columns_to_drop)
+        preds = []
+        amounts = []
+        # iterate over all models and get the predictions, each prediction will have the same weight, it should be maximum 10
+        for _, X_pred in X_preds.iterrows():
+            votes = []
         
-        # Clean prediction data
-        X_pred_clean = X_pred
-        
-        # Predict
-        pred = self.model.predict(X_pred_clean)[0]
-        
-        # Get prediction probabilities if available
-        if self.model.probability:
-            pred_probs = self.model.predict_proba(X_pred_clean)[0]
-            print(f"Prediction probabilities: Class 0: {pred_probs[0]:.4f}, Class 1: {pred_probs[1]:.4f}")
+            # Each model gets only its relevant features
+            for i, model in enumerate(self.models):
+                # Get the features this specific model was trained on
+                model_features = self.features_per_model[i]
+                
+                # Select only those features from X_pred
+                X_pred_filtered = X_pred[model_features]
+                
+                # Clean prediction data
+                X_pred_filtered_clean = X_pred_filtered.replace([np.inf, -np.inf], np.nan).dropna()
+                
+                # Only make prediction if data is valid
+                if len(X_pred_filtered_clean) > 0:
+                    vote = model.predict([X_pred_filtered_clean])[0]
+                    votes.append(vote)
             
-            # Distance from the hyperplane can also provide confidence information
-            decision_values = self.model.decision_function(X_pred_clean)[0]
-            print(f"Decision function value: {decision_values:.4f}")
-        
-        return int(pred), 10  # signal, amount
+            print(f"Individual model votes: {votes}", flush=True)
+            
+            total_weight = 0
+            weighted_signal_sum = 0
+            for vote in votes:
+                if vote == 1:
+                    total_weight += 10
+                    weighted_signal_sum += 10
+                else:
+                    total_weight += 10
+                    weighted_signal_sum -= 10
+
+            normalized_signal = weighted_signal_sum / total_weight
+            # Calculate the final prediction and amount
+            if normalized_signal > 0:
+                pred = 1
+            else:
+                pred = 0
+            preds.append(pred)
+            amounts.append(int(round(min(abs(normalized_signal) * 10, 10))))
+        return preds, amounts

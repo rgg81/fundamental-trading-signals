@@ -6,10 +6,15 @@ from lgbm_strategy import LGBMOptunaStrategy
 from rf_strategy import RandomForestOptunaStrategy
 from adaboost_strategy import AdaBoostOptunaStrategy
 from histgb_strategy import HistGBOptunaStrategy
+from svc_strategy import SVCOptunaStrategy
 from xgboost_strategy import XGBoostOptunaStrategy
 from catboost_strategy import CatBoostOptunaStrategy
 from ngboost_strategy import NGBoostOptunaStrategy
 from gp_strategy import GaussianProcessOptunaStrategy
+from knn_strategy import KNNOptunaStrategy
+from logistic_strategy import LogisticRegressionOptunaStrategy
+from nb_strategy import GaussianNBOptunaStrategy
+from mlp_strategy import MLPOptunaStrategy
 import warnings
 import quantstats as qs
 
@@ -48,6 +53,12 @@ class EnsembleOptunaStrategy(Strategy):
                 self.strategies[f'LGBM_tech_{freq}_{i}'] = LGBMOptunaStrategy(feature_set="tech_", symbol=symbol, n_trials=10, feature_frequency=f"_{freq}")
             for i in range(0, 50):
                 self.strategies[f'LGBM_mr_{freq}_{i}'] = LGBMOptunaStrategy(feature_set="mr_", symbol=symbol, n_trials=10, feature_frequency=f"_{freq}")
+            for i in range(0, 50):
+                self.strategies[f'CatBoost_regime_{freq}_{i}'] = CatBoostOptunaStrategy(feature_set="regime_", symbol=symbol, n_trials=10, feature_frequency=f"_{freq}")
+            for i in range(0, 50):
+                self.strategies[f'CatBoost_tech_{freq}_{i}'] = CatBoostOptunaStrategy(feature_set="tech_", symbol=symbol, n_trials=10, feature_frequency=f"_{freq}")
+            for i in range(0, 50):
+                self.strategies[f'CatBoost_mr_{freq}_{i}'] = CatBoostOptunaStrategy(feature_set="mr_", symbol=symbol, n_trials=10, feature_frequency=f"_{freq}")
         
         print(f"Ensemble Strategy initialized with {len(self.strategies)} strategies")
 

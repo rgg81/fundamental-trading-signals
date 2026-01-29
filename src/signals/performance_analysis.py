@@ -14,8 +14,6 @@ from svc_strategy import SVCOptunaStrategy
 from histgb_strategy import HistGBOptunaStrategy
 from xgboost_strategy import XGBoostOptunaStrategy
 from catboost_strategy import CatBoostOptunaStrategy
-from tff_strategy import TemporalFusionTransformerOptunaStrategy
-from tabnet_strategy import TabNetOptunaStrategy
 from ngboost_strategy import NGBoostOptunaStrategy
 from gp_strategy import GaussianProcessOptunaStrategy
 from pytorch_nn_strategy import PyTorchNeuralNetOptunaStrategy
