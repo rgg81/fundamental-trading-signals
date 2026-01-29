@@ -1,4 +1,0 @@
-pandas
-fredapi
-requests
-pyjstat
